@@ -118,9 +118,13 @@ All keys live under the top-level `ai_summary:` key in `settings.yml`.
 2. `post_search()` caches the result snippets in memory, keyed by query — the
    browser only ever sends the **query string**, never result data, so the LLM
    prompt can't be tampered with from the client.
-3. The injected script opens an SSE stream to `GET /ai_summary`; the server
-   streams tokens from the fast model.
-4. Clicking **More** streams `GET /ai_summary_more`, which returns structured
+3. The box shows a **Show AI summary** button — nothing is requested from the
+   model until the user clicks it (no auto-generation or token spend on load).
+4. On click, the injected script opens an SSE stream to `GET /ai_summary`; the
+   server streams tokens from the fast model. When the summary finishes, the box
+   lists its **Sources** — the top result pages (up to `max_results`) that were
+   fed to the model — each linking to the page.
+5. Clicking **More** streams `GET /ai_summary_more`, which returns structured
    JSON (overview, sections with optional code blocks, follow-up questions)
    rendered progressively.
 

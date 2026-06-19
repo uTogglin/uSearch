@@ -158,6 +158,17 @@
       color:#aaa; text-decoration:none; transition:background 0.15s;
     }
     #ai-summary-box .ai-source-tag:hover { background:rgba(255,255,255,0.12); color:#fff; }
+    #ai-summary-box .ai-sources-block { margin-top:12px; }
+    #ai-summary-box .ai-sources-label {
+      font-size:0.7rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:0.04em; color:#888; margin-bottom:7px;
+    }
+    #ai-summary-box .ai-source-num {
+      display:inline-flex; align-items:center; justify-content:center;
+      min-width:15px; height:15px; padding:0 3px; border-radius:4px;
+      background:rgba(66,133,244,0.22); color:#4285f4;
+      font-size:0.68rem; font-weight:700; flex-shrink:0;
+    }
     #ai-summary-box .ai-followup-title {
       font-weight:700; font-size:0.85rem; color:var(--color-text,#fff);
       margin:16px 0 8px 0; padding-top:14px;
@@ -406,6 +417,53 @@
     catch { return ""; }
   }
 
+  function safeHttpUrl(u) {
+    try {
+      const p = new URL(u);
+      if (p.protocol === "http:" || p.protocol === "https:") return p.href;
+    } catch (_) {}
+    return null;
+  }
+
+  // Build the "Sources" block — the result pages the model was given.
+  // Mirrors the top results sent server-side (max_results, default 5).
+  // Built from DOM nodes (no innerHTML) so adversarial titles/URLs can't inject.
+  function buildSources(results) {
+    const AI_MAX_SOURCES = 5;
+    const items = (results || []).slice(0, AI_MAX_SOURCES)
+      .map((r) => ({ url: safeHttpUrl(r && r.url), title: (r && r.title) || "" }))
+      .filter((r) => r.url);
+    if (!items.length) return null;
+
+    const block = document.createElement("div");
+    block.className = "ai-sources-block";
+
+    const label = document.createElement("div");
+    label.className = "ai-sources-label";
+    label.textContent = "Sources";
+    block.appendChild(label);
+
+    const row = document.createElement("div");
+    row.className = "ai-sources";
+    items.forEach((r, i) => {
+      const host = hostnameOf(r.url) || r.url;
+      const a = document.createElement("a");
+      a.className = "ai-source-tag";
+      a.href = r.url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.title = r.title || host;           // full page title on hover
+      const num = document.createElement("span");
+      num.className = "ai-source-num";
+      num.textContent = String(i + 1);
+      a.appendChild(num);
+      a.appendChild(document.createTextNode(" " + host));
+      row.appendChild(a);
+    });
+    block.appendChild(row);
+    return block;
+  }
+
   function renderCodeBlock(lang, code) {
     const id = "cb" + Math.random().toString(36).slice(2, 9);
     return `<div class="ai-code-block">
@@ -477,21 +535,8 @@
         panel.appendChild(el);
       }
 
-      // source tags (derived from results, not from the LLM payload)
-      const seen = new Set(), tags = [];
-      for (const r of results.slice(0, 4)) {
-        const h = hostnameOf(r.url);
-        if (!h || seen.has(h)) continue;
-        seen.add(h);
-        tags.push(`<a class="ai-source-tag" href="${esc(r.url)}" target="_blank" rel="noopener">
-          <span style="opacity:0.5;font-size:0.8em">○</span> ${esc(h)}</a>`);
-      }
-      if (tags.length) {
-        const el = document.createElement("div");
-        el.className = "ai-sources ai-block";
-        el.innerHTML = tags.join("");
-        panel.appendChild(el);
-      }
+      // Sources are now listed in the compact box (buildSources), always
+      // visible — so the More panel no longer repeats them.
 
       // sections
       if (Array.isArray(parsed.sections)) {
@@ -569,7 +614,10 @@
     footer.className = "ai-footer";
     footer.textContent = "Auto-generated based on search results · May contain inaccuracies";
 
-    contentEl.after(more, panel, footer);
+    // List the pages the model was given, directly under the summary.
+    const sources = buildSources(results);
+    if (sources) contentEl.after(sources, more, panel, footer);
+    else contentEl.after(more, panel, footer);
 
     let loaded = false, isOpen = false;
 
