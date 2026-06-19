@@ -1,0 +1,212 @@
+<!doctype html>
+<!--
+  deGoog design-fork PREVIEW (not part of the app).
+  Loads the real compiled sxng-ltr.min.css + self-hosted fonts and reproduces
+  SearXNG's "simple" theme markup so the degoog re-skin can be eyeballed.
+  Safe to delete: rm searx/static/themes/simple/degoog-preview.html
+-->
+<html class="theme-auto" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>uSearch · deGoog design preview</title>
+    <link rel="stylesheet" href="sxng-ltr.min.css" />
+    <style>
+      /* preview-only chrome, not part of the theme */
+      .preview-toolbar {
+        position: fixed;
+        top: 0.6rem;
+        right: 0.6rem;
+        z-index: 9999;
+        display: flex;
+        gap: 0.4rem;
+        font-family: "Inter", sans-serif;
+      }
+      .preview-toolbar button {
+        font: inherit;
+        font-size: 0.8rem;
+        padding: 0.35rem 0.7rem;
+        border: 1px solid var(--color-search-border);
+        border-radius: 1rem;
+        background: var(--color-degoog-surface);
+        color: var(--color-base-font);
+        cursor: pointer;
+      }
+      .preview-divider {
+        max-width: 60rem;
+        margin: 3rem auto 1rem;
+        text-align: center;
+        color: var(--color-result-publishdate-font);
+        font-size: 0.8rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body class="results_endpoint">
+    <div class="preview-toolbar">
+      <button data-theme="theme-auto">Auto</button>
+      <button data-theme="theme-light">Light</button>
+      <button data-theme="theme-dark">Dark</button>
+      <button data-theme="theme-black">Black</button>
+    </div>
+
+    <!-- ============================ HOME ============================ -->
+    <main id="main_index">
+      <div class="index">
+        <div class="title">
+          <h1>uSearch</h1>
+        </div>
+        <div id="search">
+          <div id="search_header">
+            <div id="search_view">
+              <div class="search_box">
+                <input
+                  type="text"
+                  id="q"
+                  value="how does a metasearch engine work"
+                  autocomplete="off"
+                />
+                <button id="clear_search" type="button" aria-label="Clear">
+                  <span>✕</span>
+                </button>
+                <button id="send_search" type="submit" aria-label="Search">
+                  🔍
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div class="preview-divider">— results page —</div>
+
+    <!-- ========================== RESULTS ========================== -->
+    <div id="search">
+      <div id="search_header">
+        <div id="search_logo">
+          <img src="img/favicon.svg" alt="uSearch" width="30" height="30" />
+        </div>
+        <div id="search_view">
+          <div class="search_box">
+            <input type="text" id="q" value="how does a metasearch engine work" autocomplete="off" />
+            <button id="clear_search" type="button" aria-label="Clear"><span>✕</span></button>
+            <button id="send_search" type="submit" aria-label="Search">🔍</button>
+          </div>
+        </div>
+        <div class="search_categories" id="categories_container">
+          <div id="categories">
+            <div class="category_checkbox">
+              <input type="checkbox" id="c-general" checked />
+              <label for="c-general"><div class="category_name">General</div></label>
+            </div>
+            <div class="category_checkbox">
+              <input type="checkbox" id="c-images" />
+              <label for="c-images"><div class="category_name">Images</div></label>
+            </div>
+            <div class="category_checkbox">
+              <input type="checkbox" id="c-news" />
+              <label for="c-news"><div class="category_name">News</div></label>
+            </div>
+            <div class="category_checkbox">
+              <input type="checkbox" id="c-videos" />
+              <label for="c-videos"><div class="category_name">Videos</div></label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main id="main_results">
+      <div id="results">
+        <div id="urls">
+          <article class="result result-default">
+            <div class="url_header">
+              <div class="url_wrapper">
+                <span class="url_o1"><span class="url_i1">https://en.wikipedia.org</span></span>
+                <span class="url_o2"><span class="url_i2">› wiki › Metasearch_engine</span></span>
+              </div>
+            </div>
+            <h3><a href="#">Metasearch engine — Wikipedia</a></h3>
+            <p class="content">
+              A <span class="highlight">metasearch</span> engine is an online information
+              retrieval tool that uses the data of a web search engine to produce its own
+              results, aggregating and re-ranking them in one place.
+            </p>
+            <div class="engines"><span>wikipedia</span><span>google</span><span>duckduckgo</span></div>
+          </article>
+
+          <article class="result result-default">
+            <div class="url_header">
+              <div class="url_wrapper">
+                <span class="url_o1"><span class="url_i1">https://docs.searxng.org</span></span>
+                <span class="url_o2"><span class="url_i2">› admin › architecture</span></span>
+              </div>
+            </div>
+            <h3><a href="#">How SearXNG aggregates engine responses</a></h3>
+            <p class="content">
+              Each query is dispatched to many engines in parallel; their HTML or JSON is
+              parsed into a common result shape, de-duplicated and scored before the
+              <span class="highlight">metasearch</span> page is rendered.
+            </p>
+            <div class="engines"><span>github</span><span>brave</span></div>
+          </article>
+
+          <article class="result result-default">
+            <div class="url_header">
+              <div class="url_wrapper">
+                <span class="url_o1"><span class="url_i1">https://example.org</span></span>
+                <span class="url_o2"><span class="url_i2">› blog › privacy-search</span></span>
+              </div>
+            </div>
+            <h3><a href="#">Why privacy-respecting search matters</a></h3>
+            <p class="content">
+              No tracking, no profiling — results are fetched on your behalf so the
+              upstream engines never see who you are. This is a visited-link example.
+            </p>
+            <div class="engines"><span>mojeek</span><span>startpage</span><span>qwant</span></div>
+          </article>
+        </div>
+
+        <div id="sidebar">
+          <div class="infobox">
+            <h2>Metasearch engine</h2>
+            <p>
+              A metasearch engine aggregates results from multiple search engines and
+              presents them through a single interface.
+            </p>
+            <div class="attributes">
+              <dl><dt>Type</dt><dd>Software</dd></dl>
+              <dl><dt>First built</dt><dd>1995</dd></dl>
+            </div>
+          </div>
+        </div>
+
+        <div id="pagination">
+          <div class="numbered_pagination">
+            <a class="page_number" href="#">‹</a>
+            <span class="page_number_current">1</span>
+            <a class="page_number" href="#">2</a>
+            <a class="page_number" href="#">3</a>
+            <a class="page_number" href="#">4</a>
+            <a class="page_number" href="#">›</a>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>uSearch — deGoog design fork preview</p>
+    </footer>
+
+    <script>
+      const root = document.documentElement;
+      for (const b of document.querySelectorAll(".preview-toolbar button")) {
+        b.addEventListener("click", () => {
+          root.className = b.dataset.theme;
+        });
+      }
+    </script>
+  </body>
+</html>

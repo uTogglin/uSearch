@@ -257,6 +257,39 @@ plugins:
   searx.plugins.tracker_url_remover.SXNGPlugin:
     active: true
 
+  searx.plugins.ai_summary.SXNGPlugin:
+    active: true
+
+
+# Configuration of the "AI Summary plugin" (OpenRouter):
+#
+# Streams an AI-generated overview above the search results, powered by
+# OpenRouter (https://openrouter.ai/) or any OpenAI-compatible endpoint.
+# NOTE: this is a top-level key, NOT nested under "plugins:" — the plugin
+# loader only accepts "active:" under a plugin entry.
+ai_summary:
+  base_url: "https://openrouter.ai/api/v1"
+  # The API key is read from this setting first, then from the
+  # OPENROUTER_API_KEY environment variable. Prefer the env var so the key
+  # never lands in a committed settings.yml. Leave empty to use the env var.
+  api_key: ""
+  model: "deepseek/deepseek-v4-flash"  # fast model — compact summary
+  model_more: "openai/gpt-4o"          # smart model — "More" deep-dive panel
+  # Optional OpenRouter ranking headers (safe to leave empty):
+  http_referer: ""                     # e.g. "https://my-searxng.example"
+  x_title: "SearXNG AI Summary"
+  max_results: 5                       # result snippets sent to the model
+  max_tokens: 300                      # max tokens for the compact summary
+  max_tokens_more: 800                 # max tokens for the More panel
+  timeout: 60                          # request timeout in seconds
+  # Per-IP token-bucket rate limit:
+  rate_limit_capacity: 5               # burst size
+  rate_limit_rate: 1.0                 # tokens refilled per second
+  # Persistent (SQLite) cache of completed summaries:
+  response_cache_enabled: true
+  response_cache_ttl: 604800           # 7 days, in seconds
+  # response_cache_path: "/var/cache/searxng/ai_summary_cache.db"
+
 
 # Configuration of the "Hostnames plugin":
 #

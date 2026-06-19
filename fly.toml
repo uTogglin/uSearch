@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Fly.io deployment for uSearch (SearXNG fork with the deGoog design).
+# Single machine, lowest shared VM, scales to zero when idle.
+
+app = "usearch-degoog"
+primary_region = "iad"
+
+# Swap is essential here: on 256mb RAM the per-search memory spike (parsing
+# several engine responses at once) otherwise drives the box into memory-
+# pressure thrashing, which stalls the async loop and makes EVERY engine time
+# out (0 results after 10s+). Swap absorbs the spike. (Suspend isn't usable
+# with SearXNG anyway — it breaks the long-lived HTTP client — so the fact that
+# swap disables suspend costs us nothing.)
+swap_size_mb = 512
+
+[build]
+  dockerfile = "container/fly.dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Use "stop" (full shutdown), NOT "suspend". Suspend snapshots the VM's RAM,
+  # but SearXNG holds a long-lived async httpx client; restoring it leaves dead
+  # sockets, so every engine request hangs to timeout -> searches return 0
+  # results after ~12s. A clean cold boot (~5s) starts a fresh process with
+  # working networking. Still scales compute to zero.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 40
+    hard_limit = 50
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # 512mb RAM + the swap above. ~28 engines across categories
+  # (see settings.template.yml); the extra headroom over 256mb absorbs the
+  # per-search parsing spike directly so it rarely has to touch swap.
+  memory = "512mb"

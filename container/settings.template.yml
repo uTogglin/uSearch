@@ -1,8 +1,72 @@
-# Read the documentation before extending the defaults:
-# https://docs.searxng.org/admin/settings/
+# Settings for the Fly.io deployment — tuned to run a broad engine set inside
+# 512mb of RAM (+512mb swap as a safety net). See fly.toml for why we use
+# swap + auto_stop = "stop" rather than suspend.
+#
+# Why this fits where the full ~90-engine default OOM'd: SearXNG only queries
+# the engines in the *active category* of a search. The default set crams 40+
+# engines into the "general" category, so one search parses 40+ responses at
+# once -> memory spike -> OOM. Here each category has only a handful, so any
+# single search stays light while the tabs (images/news/videos/science) still
+# work. Map/OpenStreetMap is intentionally omitted (its osm_keys_tags.json is
+# 2.6MB, lazy-loaded on first use).
 
-use_default_settings: true
+use_default_settings:
+  engines:
+    keep_only:
+      # general
+      - google
+      - duckduckgo
+      - bing
+      - brave
+      - startpage
+      - qwant
+      - mojeek
+      - wikipedia
+      - wikidata
+      # images
+      - duckduckgo images
+      - google images
+      - bing images
+      # videos
+      - duckduckgo videos
+      - bing videos
+      # news
+      - google news
+      - bing news
+      # IT / dev
+      - github
+      - stackoverflow
+      - pypi
+      - hackernews
+      # science
+      - arxiv
+      - google scholar
+      - pubmed
+      - semantic scholar
+      # social
+      - reddit
+      # videos / music
+      - youtube
+      - bandcamp
+      # dictionaries
+      - wiktionary
+
+# Per-engine overrides. hackernews ships `disabled: true` in the defaults, so
+# keep_only alone would include it but leave it inactive — flip it on here.
+engines:
+  - name: hackernews
+    disabled: false
 
 server:
-  secret_key: "ultrasecretkey"
-  image_proxy: true
+  secret_key: "ultrasecretkey" # overwritten by $SEARXNG_SECRET / entrypoint
+  image_proxy: false
+  limiter: false
+
+outgoing:
+  # Slower engines (and the shared CPU) need more than the 3s default, or they
+  # trip "engine timeout" and the tab comes back empty.
+  request_timeout: 6.0
+  max_request_timeout: 10.0
+
+ui:
+  infinite_scroll: false

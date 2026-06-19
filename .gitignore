@@ -27,3 +27,10 @@ searx/version_frozen.py
 .dir-locals.el
 
 .python-version
+
+# local Python virtualenv
+.venv/
+
+# local secrets — never commit API keys
+container/.env
+.env

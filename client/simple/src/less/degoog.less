@@ -1,0 +1,183 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+// =========================================================================
+//  deGoog design fork
+//  -----------------------------------------------------------------------
+//  Component-level styling ported from the degoog theme
+//  (https://github.com/degoog-org/degoog, src/styles) onto SearXNG's
+//  "simple" theme. Colors live in definitions.less; this file carries the
+//  things degoog is recognised by: Inter type, the Google Sans logo face,
+//  the pill-shaped search bar, flat results and circular pagination.
+//
+//  Imported last from style.less so it wins on equal specificity. Uses the
+//  .ltr-* mixins defined in style-ltr.less / style-rtl.less so it stays
+//  direction-aware.
+// =========================================================================
+
+// --- Fonts (self-hosted, no external requests) ---------------------------
+// Served from the theme root: searx/static/themes/simple/fonts/
+// (copied from client/simple/static/fonts/ at build time).
+
+@font-face {
+  font-family: "Inter";
+  src: url("./fonts/Inter-Variable.ttf") format("truetype-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Google Sans";
+  src: url("./fonts/GoogleSans-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@degoog-font: "Inter", arial, sans-serif;
+@degoog-display: "Google Sans", "Inter", arial, sans-serif;
+
+// --- Typography ----------------------------------------------------------
+
+html {
+  font-family: @degoog-font;
+}
+
+body,
+input,
+button,
+select,
+textarea,
+optgroup {
+  font-family: @degoog-font;
+}
+
+// --- Pill search bar -----------------------------------------------------
+// degoog's signature: a rounded "pill" that lifts on hover/focus.
+
+.search_box {
+  border-radius: 1.5rem;
+  border: 1px solid transparent;
+  transition:
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+
+  &:hover,
+  &:focus-within {
+    box-shadow: 0 1px 6px rgb(32 33 36 / 28%);
+  }
+}
+
+#q {
+  .ltr-rounded-left-corners(1.5rem);
+  .ltr-padding-left(1.4rem);
+}
+
+#send_search {
+  .ltr-rounded-right-corners(1.5rem);
+}
+
+// Keep the leading/trailing buttons legible on hover (the default rule
+// recolors the glyph to the field background, which vanishes against the
+// degoog hover surface).
+#send_search:hover,
+#clear_search:hover {
+  background-color: var(--color-degoog-surface-hover);
+  color: var(--color-degoog-primary);
+}
+
+// On the results page the bar shrinks but keeps its pill shape.
+body.results_endpoint .search_box {
+  box-shadow: var(--color-search-shadow);
+}
+
+// --- Logo / brand --------------------------------------------------------
+
+.page_with_header .logo,
+#search_logo,
+.index .title {
+  font-family: @degoog-display;
+}
+
+// --- Results: flat, Google-flavoured -------------------------------------
+
+.result {
+  h3 a {
+    font-size: 1.25rem;
+    line-height: 1.3;
+    letter-spacing: 0;
+  }
+
+  // URL/cite line sits quiet and dark above the title, degoog style.
+  .url_wrapper {
+    color: var(--color-degoog-cite);
+    font-size: 0.875rem;
+  }
+
+  .content {
+    line-height: 1.58;
+  }
+}
+
+// Circular favicons next to results, like degoog.
+.favicon img {
+  border-radius: 50%;
+}
+
+// --- Answer / infobox surfaces ------------------------------------------
+// Softer, larger corners to match degoog's rounded panels.
+
+#answers,
+#sidebar .infobox {
+  border-radius: 0.75rem;
+}
+
+// --- Circular numbered pagination ---------------------------------------
+
+.numbered_pagination {
+  gap: 0.25rem;
+
+  .page_number,
+  .page_number_current {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    text-decoration: none !important;
+  }
+
+  .page_number {
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: var(--color-degoog-surface) !important;
+    }
+  }
+
+  .page_number_current {
+    font-weight: 700;
+    color: var(--color-base-font);
+  }
+}
+
+// --- Misc polish ---------------------------------------------------------
+
+::selection {
+  background: rgb(86 115 172 / 30%);
+}
+
+::-webkit-scrollbar {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-base-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-search-border);
+  border-radius: 0.25rem;
+}
