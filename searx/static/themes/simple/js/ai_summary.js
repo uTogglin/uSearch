@@ -158,6 +158,10 @@
       color:#aaa; text-decoration:none; transition:background 0.15s;
     }
     #ai-summary-box .ai-source-tag:hover { background:rgba(255,255,255,0.12); color:#fff; }
+    #ai-summary-box .ai-source-favicon {
+      width:14px; height:14px; border-radius:3px; flex-shrink:0;
+      background:#fff; object-fit:contain; padding:1px; box-sizing:border-box;
+    }
     #ai-summary-box .ai-sources-block { margin-top:12px; }
     #ai-summary-box .ai-sources-label {
       font-size:0.7rem; font-weight:700; text-transform:uppercase;
@@ -253,10 +257,12 @@
       const a = el.querySelector("h3 a") || el.querySelector("a");
       const s = el.querySelector(".content") || el.querySelector("p");
       const content = s ? s.textContent.trim() : "";
+      const fav = el.querySelector(".favicon img");
       if (content) out.push({
         title:   a ? a.textContent.trim() : "",
         url:     a ? (a.href || "") : "",
         content: content.slice(0, 300),
+        favicon: fav ? (fav.src || "") : "",
       });
     });
     return out;
@@ -431,7 +437,7 @@
   function buildSources(results) {
     const AI_MAX_SOURCES = 5;
     const items = (results || []).slice(0, AI_MAX_SOURCES)
-      .map((r) => ({ url: safeHttpUrl(r && r.url), title: (r && r.title) || "" }))
+      .map((r) => ({ url: safeHttpUrl(r && r.url), title: (r && r.title) || "", favicon: (r && r.favicon) || "" }))
       .filter((r) => r.url);
     if (!items.length) return null;
 
@@ -457,6 +463,17 @@
       num.className = "ai-source-num";
       num.textContent = String(i + 1);
       a.appendChild(num);
+      // Site icon, mirrored from the result list's favicon (same-origin proxy
+      // URL, so no extra external request). Drops out silently if it fails.
+      if (r.favicon) {
+        const img = document.createElement("img");
+        img.className = "ai-source-favicon";
+        img.src = r.favicon;
+        img.alt = "";
+        img.loading = "lazy";
+        img.addEventListener("error", () => img.remove());
+        a.appendChild(img);
+      }
       a.appendChild(document.createTextNode(" " + host));
       row.appendChild(a);
     });

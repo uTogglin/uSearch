@@ -360,7 +360,41 @@ def get_pretty_url(parsed_url: urllib.parse.ParseResult):
     query_args: list[tuple[str, str]] = list(urllib.parse.parse_qsl(parsed_url.query))
     if not query_args and parsed_url.query:
         path += (" › .." if len(parsed_url.query) > 24 else " › ") + parsed_url.query[-24:]
-    return [parsed_url.scheme + "://" + parsed_url.netloc, path]
+    # Show the bare host (no scheme) as the first breadcrumb part, Google-style.
+    return [parsed_url.netloc, path]
+
+
+# Public suffixes made of two labels, so "bbc.co.uk" resolves to the brand
+# "bbc" rather than "co". Small hand-picked list — enough for the common ccSLDs.
+_TWO_LABEL_TLDS = frozenset(
+    {
+        'co.uk', 'org.uk', 'gov.uk', 'ac.uk', 'co.jp', 'co.kr', 'co.nz', 'co.za',
+        'co.in', 'co.id', 'com.au', 'com.br', 'com.mx', 'com.tr', 'com.sg',
+        'com.hk', 'com.cn', 'com.tw',
+    }
+)
+
+
+def get_result_site_name(parsed_url: urllib.parse.ParseResult) -> str:
+    """A short, human-friendly brand name for a result's domain.
+
+    Drawn from the registrable domain so it can sit, bold, above the URL
+    breadcrumb the way other search engines label each result. e.g.
+    ``en.wikipedia.org`` -> ``Wikipedia``, ``bbc.co.uk`` -> ``Bbc``.
+    """
+    host = parsed_url.netloc.rsplit('@', 1)[-1].split(':', 1)[0].lower()
+    if host.startswith('www.'):
+        host = host[4:]
+    labels = [l for l in host.split('.') if l]
+    if not labels:
+        return parsed_url.netloc
+    if len(labels) >= 3 and '.'.join(labels[-2:]) in _TWO_LABEL_TLDS:
+        name = labels[-3]
+    elif len(labels) >= 2:
+        name = labels[-2]
+    else:
+        name = labels[0]
+    return name[:1].upper() + name[1:]
 
 
 def get_client_settings():
@@ -422,6 +456,7 @@ def render(template_name: str, **kwargs):
     kwargs['enable_metrics'] = get_setting('general.enable_metrics')
     kwargs['get_setting'] = get_setting
     kwargs['get_pretty_url'] = get_pretty_url
+    kwargs['get_result_site_name'] = get_result_site_name
 
     # values from settings: donation_url
     donation_url = get_setting('general.donation_url')
