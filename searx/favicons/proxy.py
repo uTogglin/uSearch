@@ -14,7 +14,7 @@ import flask
 from httpx import HTTPError
 import msgspec
 
-from searx import get_setting
+from searx import get_setting, logger
 
 from searx.webutils import new_hmac, is_hmac_of
 from searx.exceptions import SearxEngineResponseException
@@ -22,6 +22,8 @@ from searx.extended_types import sxng_request
 
 from .resolvers import DEFAULT_RESOLVER_MAP
 from . import cache
+
+logger = logger.getChild('favicons.proxy')
 
 DEFAULT_FAVICON_URL = {}
 CFG: "FaviconProxyConfig" = None  # type: ignore
@@ -352,13 +354,34 @@ def favicon_data_url_batch(authorities: "list[str]", max_count: int) -> "dict[st
     if not resolver or resolver not in CFG.resolver_map.keys():
         return {authority: placeholder for authority in todo}
 
+    # Warm the cache's SQLite schema on THIS (request) thread before the pool
+    # starts. The schema is created lazily on first DB access; the init guard
+    # (`SQLiteAppl._init_done`) flips to "done" BEFORE the CREATE TABLE commits.
+    # If the very first access happens concurrently from the worker threads, one
+    # worker sets the guard while another races ahead and queries a table that
+    # does not exist yet → "no such table: blob_map", which aborts the whole
+    # batch (HTTP 500) and blanks every favicon on the page. One main-thread touch
+    # creates and commits the schema up front, so the workers only ever open
+    # connections to an already-initialised DB.
+    try:
+        _ = cache.CACHE.DB  # noqa: F841
+    except Exception:  # pylint: disable=broad-except
+        logger.exception("favicon cache warm-up failed")
+
     def resolve(authority: str) -> str:
-        data, mime = search_favicon(resolver, authority)
-        if data is not None and mime is not None:
-            return f"data:{mime};base64,{str(base64.b64encode(data), 'utf-8')}"  # type: ignore
+        # Resolve defensively: a single authority's failure (network, resolver,
+        # or a transient cache error) must never propagate out of the pool and
+        # 500 the whole batch — that would blank EVERY favicon on the page.
+        try:
+            data, mime = search_favicon(resolver, authority)
+            if data is not None and mime is not None:
+                return f"data:{mime};base64,{str(base64.b64encode(data), 'utf-8')}"  # type: ignore
+        except Exception:  # pylint: disable=broad-except
+            logger.exception("favicon batch resolve failed for %s", authority)
         return placeholder
 
     # The cache (per-thread SQLite connection) and searx.network (dispatches to a
-    # shared background event loop) are both safe to call from worker threads.
+    # shared background event loop) are both safe to call from worker threads once
+    # the schema has been initialised above.
     with ThreadPoolExecutor(max_workers=min(FAVICON_BATCH_WORKERS, len(todo))) as pool:
         return dict(zip(todo, pool.map(resolve, todo)))
