@@ -15,7 +15,7 @@ import typing
 
 import urllib
 import urllib.parse
-from urllib.parse import urlencode, urlparse, unquote
+from urllib.parse import urlencode, urlparse, unquote, parse_qsl
 
 import warnings
 import httpx
@@ -40,12 +40,15 @@ from flask import (
 from flask.wrappers import Response
 from flask.json import jsonify
 
+from werkzeug.datastructures import MultiDict
+
 from flask_babel import (
     Babel,
     gettext,
 )
 
 import searx
+from searx import echannel
 from searx.extended_types import sxng_request
 from searx import (
     logger,
@@ -415,6 +418,7 @@ def get_client_settings():
         'safesearch': req_pref.get_value('safesearch'),
         'theme': req_pref.get_value('theme'),
         'doi_resolver': get_doi_resolver(),
+        'e2e_pubkey': echannel.public_key_b64(),
     }
 
 
@@ -657,8 +661,15 @@ def search():
     # pylint: disable=too-many-locals, too-many-return-statements, too-many-branches
     # pylint: disable=too-many-statements
 
+    # The encrypted /esearch route decrypts the client's form and stashes it on
+    # flask.g so this handler can be reused verbatim; fall back to the real form
+    # for the normal (plaintext) /search path.
+    form = getattr(flask.g, 'esearch_form', None)
+    if form is None:
+        form = sxng_request.form
+
     # output_format
-    output_format = sxng_request.form.get('format', 'html')
+    output_format = form.get('format', 'html')
     if output_format not in OUTPUT_FORMATS:
         output_format = 'html'
 
@@ -666,12 +677,12 @@ def search():
         flask.abort(403)
 
     # check if there is query (not None and not an empty string)
-    if not sxng_request.form.get('q'):
+    if not form.get('q'):
         if output_format == 'html':
             return render(
                 # fmt: off
                 'index.html',
-                selected_categories=get_selected_categories(sxng_request.preferences, sxng_request.form),
+                selected_categories=get_selected_categories(sxng_request.preferences, form),
                 # fmt: on
             )
         return index_error(output_format, 'No query'), 400
@@ -682,7 +693,7 @@ def search():
     result_container = None
     try:
         search_query, raw_text_query, _, _, selected_locale = get_search_query_from_webapp(
-            sxng_request.preferences, sxng_request.form
+            sxng_request.preferences, form
         )
         search_obj = searx.search.SearchWithPlugins(search_query, sxng_request, sxng_request.user_plugins)
         result_container = search_obj.search()
@@ -755,7 +766,7 @@ def search():
         response_rss = render(
             'opensearch_response_rss.xml',
             results=results,
-            q=sxng_request.form['q'],
+            q=form['q'],
         )
         return Response(response_rss, mimetype='text/xml')
 
@@ -788,7 +799,7 @@ def search():
         # fmt: off
         'results.html',
         results = results,
-        q=sxng_request.form['q'],
+        q=form['q'],
         selected_categories = search_query.categories,
         pageno = search_query.pageno,
         time_range = search_query.time_range or '',
@@ -808,11 +819,50 @@ def search():
             settings['search']['languages'],
             fallback=sxng_request.preferences.get_value("language")
         ),
-        timeout_limit = sxng_request.form.get('timeout_limit', None),
+        timeout_limit = form.get('timeout_limit', None),
         timings = engine_timings_pairs,
         max_response_time = max_response_time
         # fmt: on
     )
+
+
+@app.route('/esearch', methods=['POST'])
+def esearch():
+    """Encrypted search.
+
+    Body is an ``{epk, iv, ct}`` envelope (see :mod:`searx.echannel`). The
+    decrypted plaintext is the same urlencoded form a normal POST /search would
+    carry, so the query never appears in the URL or in any header the Cloudflare
+    edge can read. The existing :func:`search` handler is reused verbatim (it
+    picks the decrypted form up off ``flask.g``); its rendered HTML (or a redirect
+    target) is encrypted back to the client, which swaps it into the page.
+    """
+    if not echannel.is_enabled():
+        flask.abort(404)
+    body = sxng_request.get_json(silent=True)
+    try:
+        plaintext, session = echannel.open_request(body)
+    except echannel.EChannelError:
+        flask.abort(400)
+
+    form = MultiDict(parse_qsl(plaintext.decode('utf-8'), keep_blank_values=True))
+    form['format'] = 'html'  # the client swaps HTML; never serve other formats here
+    flask.g.esearch_form = form
+
+    resp = make_response(search())
+    if resp.status_code in (301, 302, 303, 307, 308):
+        payload = json.dumps({'redirect': resp.headers.get('Location', '')})
+    else:
+        # Run the inner page through the after_request pipeline so it picks up
+        # the same body rewrites a normal page gets (notably the ai_summary.js
+        # injection), which would otherwise be skipped because this request's
+        # final response is the JSON envelope below.
+        try:
+            resp = app.process_response(resp)
+        except Exception:  # pylint: disable=broad-except
+            logger.exception('esearch: process_response failed; serving raw body')
+        payload = json.dumps({'html': resp.get_data(as_text=True)})
+    return jsonify(session.encrypt(payload))
 
 
 @app.route('/about', methods=['GET'])
@@ -838,18 +888,19 @@ def info(pagename, locale):
     )
 
 
-@app.route('/autocompleter', methods=['GET', 'POST'])
-def autocompleter():
-    """Return autocompleter results"""
+def _run_autocompleter(query: str, xhr: bool):
+    """Compute autocompletion suggestions for ``query``.
 
-    # run autocompleter
+    Returns ``(suggestions_json, mimetype)``. Shared by the plaintext
+    ``/autocompleter`` route and the encrypted ``/eautocompleter`` route.
+    """
     results = []
 
     # set blocked engines
     disabled_engines = sxng_request.preferences.engines.get_disabled()
 
     # parse query
-    raw_text_query = RawTextQuery(sxng_request.form.get('q', ''), disabled_engines)
+    raw_text_query = RawTextQuery(query, disabled_engines)
     sug_prefix = raw_text_query.getQuery()
 
     for obj in searx.answerers.STORAGE.ask(sug_prefix):
@@ -874,7 +925,7 @@ def autocompleter():
         for autocomplete_text in raw_text_query.autocomplete_list:
             results.append(raw_text_query.get_autocomplete_full_query(autocomplete_text))
 
-    if sxng_request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+    if xhr:
         # the suggestion request comes from the searx search form
         suggestions = json.dumps(results)
         mimetype = 'application/json'
@@ -883,8 +934,42 @@ def autocompleter():
         suggestions = json.dumps([sug_prefix, results])
         mimetype = 'application/x-suggestions+json'
 
-    suggestions = escape(suggestions, False)
+    return escape(suggestions, False), mimetype
+
+
+@app.route('/autocompleter', methods=['GET', 'POST'])
+def autocompleter():
+    """Return autocompleter results"""
+    suggestions, mimetype = _run_autocompleter(
+        sxng_request.form.get('q', ''),
+        sxng_request.headers.get('X-Requested-With') == 'XMLHttpRequest',
+    )
     return Response(suggestions, mimetype=mimetype)
+
+
+@app.route('/eautocompleter', methods=['POST'])
+def eautocompleter():
+    """Encrypted autocompleter.
+
+    Body is an ``{epk, iv, ct}`` envelope whose plaintext is JSON ``{"q": ...}``;
+    the partial query therefore never reaches the Cloudflare edge in clear. The
+    reply is the ``[sug_prefix, results]`` shape (matching the search form's
+    expectation), encrypted back to the client.
+    """
+    if not echannel.is_enabled():
+        flask.abort(404)
+    body = sxng_request.get_json(silent=True)
+    try:
+        plaintext, session = echannel.open_request(body)
+    except echannel.EChannelError:
+        flask.abort(400)
+    try:
+        query = json.loads(plaintext.decode('utf-8')).get('q', '')
+    except (ValueError, AttributeError):
+        flask.abort(400)
+
+    suggestions, _ = _run_autocompleter(query, xhr=False)
+    return jsonify(session.encrypt(suggestions))
 
 
 @app.route('/preferences', methods=['GET', 'POST'])

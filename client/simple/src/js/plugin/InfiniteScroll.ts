@@ -3,6 +3,7 @@
 import { Plugin } from "../Plugin.ts";
 import { http, settings } from "../toolkit.ts";
 import { assertElement } from "../util/assertElement.ts";
+import { encryptedSearchAvailable, fetchEncryptedPage } from "../util/esearch.ts";
 import { getElement } from "../util/getElement.ts";
 
 /**
@@ -40,8 +41,15 @@ export default class InfiniteScroll extends Plugin {
       paginationElement.replaceChildren(spinnerElement);
 
       try {
-        const res = await http("POST", action, { body: new FormData(form) });
-        const nextPage = await res.text();
+        // Route the next-page fetch through the encrypted channel so the query
+        // (carried in the form's hidden fields) never reaches the edge in clear.
+        let nextPage: string;
+        if (encryptedSearchAvailable()) {
+          nextPage = await fetchEncryptedPage(form);
+        } else {
+          const res = await http("POST", action, { body: new FormData(form) });
+          nextPage = await res.text();
+        }
         if (!nextPage) return;
 
         const nextPageDoc = new DOMParser().parseFromString(nextPage, "text/html");

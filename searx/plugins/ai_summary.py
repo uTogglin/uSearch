@@ -44,7 +44,7 @@ import typing as t
 
 import httpx
 from flask_babel import gettext as _
-from searx import get_setting
+from searx import echannel, get_setting
 from searx.plugins import Plugin, PluginInfo
 
 if t.TYPE_CHECKING:
@@ -385,9 +385,146 @@ class SXNGPlugin(Plugin):
         # ── Compact summary endpoint ─────────────────────────────────────
         _MAX_QUERY_LEN = 500
 
+        # ── Shared SSE payload producers ─────────────────────────────────
+        # Each yields the *bare* payload strings — exactly the text that goes
+        # after ``data: `` and before ``\n\n`` in the plaintext SSE stream
+        # (e.g. ``json.dumps(chunk)``, ``"[CACHED]"``, ``[DONE]``). The GET
+        # routes wrap these verbatim; the encrypted POST routes wrap each
+        # through ``session.encrypt(...)``. This keeps both transports driven
+        # by one source of truth so the GET behaviour is unchanged.
+
+        def _compact_payloads(query, model, max_tokens, system_prompt, results):
+            _incr("requests_compact")
+            start   = time.time()
+            llm_gen = None
+            try:
+                cached = _db_get(query, "compact")
+                if cached:
+                    _incr("cache_hits_compact")
+                    yield "\"[CACHED]\""
+                    yield json.dumps(cached)
+                    yield "[DONE]"
+                    return
+                chunks: list = []
+                try:
+                    llm_gen = _stream_llm(query, results, model,
+                                          max_tokens, system_prompt)
+                    for chunk in llm_gen:
+                        chunks.append(chunk)
+                        yield json.dumps(chunk)
+                except Exception as exc:
+                    logger.warning("ai_summary stream error: %s", exc)
+                    _incr("errors_compact")
+                finally:
+                    if llm_gen is not None:
+                        llm_gen.close()
+                if chunks:
+                    _db_set(query, "compact", "".join(chunks))
+                yield "[DONE]"
+            finally:
+                _record_latency("latencies_compact", time.time() - start)
+
+        def _more_payloads(query, model_more, max_tokens, system_prompt, results):
+            _incr("requests_more")
+            start   = time.time()
+            llm_gen = None
+            try:
+                cached = _db_get(query, "more")
+                if cached:
+                    _incr("cache_hits_more")
+                    # Send full JSON as a single chunk — JS progressive renderer
+                    # handles a one-shot payload identically to a streamed one.
+                    yield json.dumps(cached)
+                    yield "[DONE]"
+                    return
+                chunks: list = []
+                try:
+                    llm_gen = _stream_llm(query, results, model_more,
+                                          max_tokens, system_prompt)
+                    for chunk in llm_gen:
+                        chunks.append(chunk)
+                        yield json.dumps(chunk)
+                except Exception as exc:
+                    logger.warning("ai_summary_more stream error: %s", exc)
+                    _incr("errors_more")
+                finally:
+                    if llm_gen is not None:
+                        llm_gen.close()
+                if chunks:
+                    _db_set(query, "more", "".join(chunks))
+                yield "[DONE]"
+            finally:
+                _record_latency("latencies_more", time.time() - start)
+
+        def _sse_plain(payloads):
+            """Wrap bare payload strings as plaintext SSE events."""
+            for payload in payloads:
+                yield f"data: {payload}\n\n"
+
+        def _sse_encrypted(session, payloads):
+            """Wrap bare payload strings as per-frame-encrypted SSE events."""
+            for payload in payloads:
+                yield f"data: {json.dumps(session.encrypt(payload))}\n\n"
+
+        def _client_ip():
+            return (freq.headers.get("X-Forwarded-For", "") or freq.remote_addr or "").split(",")[0].strip()
+
+        def _open_encrypted_request():
+            """Parse + decrypt the POST body. Returns ``(query, session)`` or a
+            ``(None, error_Response)`` tuple where the error is a plain HTTP 400."""
+            body = freq.get_json(silent=True)
+            if not isinstance(body, dict):
+                return None, Response("bad request", status=400)
+            try:
+                plaintext, session = echannel.open_request(body)
+            except echannel.EChannelError:
+                return None, Response("bad request", status=400)
+            try:
+                req = json.loads(plaintext)
+                query = (req.get("q", "") if isinstance(req, dict) else "").strip()[:_MAX_QUERY_LEN]
+            except Exception:
+                return None, Response("bad request", status=400)
+            return (query, session), None
+
+        def _compact_setup(query):
+            """Shared compact-route prep. Returns ``(args_tuple, None)`` ready for
+            ``_compact_payloads`` or ``(None, [early_payloads])`` for an early
+            ``[DONE]``-style stream."""
+            if not query:
+                return None, ["[DONE]"]
+            model         = _setting("model")
+            max_tokens    = int(_setting("max_tokens", 300))
+            system_prompt = _DEFAULT_PROMPT
+            if not model:
+                logger.error("ai_summary: 'model' missing from settings.yml")
+                return None, ["[DONE]"]
+            results = _cache_get(query)
+            if not results:
+                logger.warning(
+                    "ai_summary: no cached results for %r — "
+                    "post_search may not have run yet", query
+                )
+                return None, ["[DONE]"]
+            logger.info("ai_summary: summarising %d results for %r", len(results), query)
+            return (query, model, max_tokens, system_prompt, results), None
+
+        def _more_setup(query):
+            """Shared More-route prep. Mirror of :func:`_compact_setup`."""
+            if not query:
+                return None, ["[DONE]"]
+            model_more    = _setting("model_more") or _setting("model")
+            max_tokens    = int(_setting("max_tokens_more", 800))
+            system_prompt = _DEFAULT_PROMPT_MORE
+            if not model_more:
+                return None, ["[DONE]"]
+            results = _cache_get(query)
+            if not results:
+                return None, ["[DONE]"]
+            return (query, model_more, max_tokens, system_prompt, results), None
+
         @app.route("/ai_summary", methods=["GET"])
         def ai_summary_api():
-            ip = (freq.headers.get("X-Forwarded-For", "") or freq.remote_addr or "").split(",")[0].strip()
+            ip = _client_ip()
             if not _check_rate_limit(ip):
                 _incr("rate_limited")
                 return Response(
@@ -396,61 +533,13 @@ class SXNGPlugin(Plugin):
                     headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
                 )
             query = freq.args.get("q", "").strip()[:_MAX_QUERY_LEN]
-            if not query:
-                return Response("data: [DONE]\n\n", mimetype="text/event-stream")
-
-            model         = _setting("model")
-            max_tokens    = int(_setting("max_tokens", 300))
-            system_prompt = _DEFAULT_PROMPT
-
-            if not model:
-                logger.error("ai_summary: 'model' missing from settings.yml")
-                return Response("data: [DONE]\n\n", mimetype="text/event-stream")
-
-            # Read results from cache — populated by post_search() hook
-            results = _cache_get(query)
-            if not results:
-                logger.warning(
-                    "ai_summary: no cached results for %r — "
-                    "post_search may not have run yet", query
-                )
-                return Response("data: [DONE]\n\n", mimetype="text/event-stream")
-
-            logger.info("ai_summary: summarising %d results for %r", len(results), query)
-
-            def generate():
-                _incr("requests_compact")
-                start   = time.time()
-                llm_gen = None
-                try:
-                    cached = _db_get(query, "compact")
-                    if cached:
-                        _incr("cache_hits_compact")
-                        yield "data: \"[CACHED]\"\n\n"
-                        yield f"data: {json.dumps(cached)}\n\n"
-                        yield "data: [DONE]\n\n"
-                        return
-                    chunks: list = []
-                    try:
-                        llm_gen = _stream_llm(query, results, model,
-                                              max_tokens, system_prompt)
-                        for chunk in llm_gen:
-                            chunks.append(chunk)
-                            yield f"data: {json.dumps(chunk)}\n\n"
-                    except Exception as exc:
-                        logger.warning("ai_summary stream error: %s", exc)
-                        _incr("errors_compact")
-                    finally:
-                        if llm_gen is not None:
-                            llm_gen.close()
-                    if chunks:
-                        _db_set(query, "compact", "".join(chunks))
-                    yield "data: [DONE]\n\n"
-                finally:
-                    _record_latency("latencies_compact", time.time() - start)
+            args, early = _compact_setup(query)
+            if early is not None:
+                return Response("".join(f"data: {p}\n\n" for p in early),
+                                mimetype="text/event-stream")
 
             return Response(
-                stream_with_context(generate()),
+                stream_with_context(_sse_plain(_compact_payloads(*args))),
                 mimetype="text/event-stream",
                 headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
             )
@@ -458,7 +547,7 @@ class SXNGPlugin(Plugin):
         # ── More panel endpoint ──────────────────────────────────────────
         @app.route("/ai_summary_more", methods=["GET"])
         def ai_summary_more_api():
-            ip = (freq.headers.get("X-Forwarded-For", "") or freq.remote_addr or "").split(",")[0].strip()
+            ip = _client_ip()
             if not _check_rate_limit(ip):
                 _incr("rate_limited")
                 return Response(
@@ -467,57 +556,56 @@ class SXNGPlugin(Plugin):
                     headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
                 )
             query = freq.args.get("q", "").strip()[:_MAX_QUERY_LEN]
-            if not query:
-                return Response("data: [DONE]\n\n", mimetype="text/event-stream")
-
-            model_more    = _setting("model_more") or _setting("model")
-            max_tokens    = int(_setting("max_tokens_more", 800))
-            system_prompt =  _DEFAULT_PROMPT_MORE
-
-            if not model_more:
-                return Response("data: [DONE]\n\n", mimetype="text/event-stream")
-
-            results = _cache_get(query)
-            if not results:
-                return Response("data: [DONE]\n\n", mimetype="text/event-stream")
-
-            def generate():
-                _incr("requests_more")
-                start   = time.time()
-                llm_gen = None
-                try:
-                    cached = _db_get(query, "more")
-                    if cached:
-                        _incr("cache_hits_more")
-                        # Send full JSON as a single chunk — JS progressive renderer
-                        # handles a one-shot payload identically to a streamed one.
-                        yield f"data: {json.dumps(cached)}\n\n"
-                        yield "data: [DONE]\n\n"
-                        return
-                    chunks: list = []
-                    try:
-                        llm_gen = _stream_llm(query, results, model_more,
-                                              max_tokens, system_prompt)
-                        for chunk in llm_gen:
-                            chunks.append(chunk)
-                            yield f"data: {json.dumps(chunk)}\n\n"
-                    except Exception as exc:
-                        logger.warning("ai_summary_more stream error: %s", exc)
-                        _incr("errors_more")
-                    finally:
-                        if llm_gen is not None:
-                            llm_gen.close()
-                    if chunks:
-                        _db_set(query, "more", "".join(chunks))
-                    yield "data: [DONE]\n\n"
-                finally:
-                    _record_latency("latencies_more", time.time() - start)
+            args, early = _more_setup(query)
+            if early is not None:
+                return Response("".join(f"data: {p}\n\n" for p in early),
+                                mimetype="text/event-stream")
 
             return Response(
-                stream_with_context(generate()),
+                stream_with_context(_sse_plain(_more_payloads(*args))),
                 mimetype="text/event-stream",
                 headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
             )
+
+        # ── Encrypted (E2E) endpoints ─────────────────────────────────────
+        # Identical logic to the GET routes, but the request body is an
+        # encrypted ``{epk,iv,ct}`` envelope and every SSE frame payload is
+        # encrypted with the per-request session key. A ``session`` always
+        # exists for every post-decrypt early return, so the client's single
+        # decrypt path always works.
+        def _eai_stream(setup_fn, payload_fn):
+            ip = _client_ip()
+            parsed, err = _open_encrypted_request()
+            if err is not None:
+                return err
+            query, session = parsed
+            if not _check_rate_limit(ip):
+                _incr("rate_limited")
+                early = _sse_encrypted(session, ["\"[ERROR] Rate limit exceeded\"", "[DONE]"])
+                return Response(
+                    "".join(early), status=429, mimetype="text/event-stream",
+                    headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+                )
+            args, early = setup_fn(query)
+            if early is not None:
+                return Response(
+                    "".join(_sse_encrypted(session, early)),
+                    mimetype="text/event-stream",
+                    headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+                )
+            return Response(
+                stream_with_context(_sse_encrypted(session, payload_fn(*args))),
+                mimetype="text/event-stream",
+                headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+            )
+
+        @app.route("/eai_summary", methods=["POST"])
+        def eai_summary_api():
+            return _eai_stream(_compact_setup, _compact_payloads)
+
+        @app.route("/eai_summary_more", methods=["POST"])
+        def eai_summary_more_api():
+            return _eai_stream(_more_setup, _more_payloads)
 
         # ── Stats endpoint ────────────────────────────────────────────────
         @app.route("/ai_summary_stats", methods=["GET"])

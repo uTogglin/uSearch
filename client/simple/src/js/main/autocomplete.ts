@@ -2,18 +2,35 @@
 
 import { http, listen, settings } from "../toolkit.ts";
 import { assertElement } from "../util/assertElement.ts";
+import { getChannel, isAvailable } from "../util/echannel.ts";
+import { submitEncrypted } from "../util/esearch.ts";
 
 const fetchResults = async (qInput: HTMLInputElement, query: string): Promise<void> => {
   try {
-    let res: Response;
+    let results: [string, string[]];
 
-    if (settings.method === "GET") {
-      res = await http("GET", `./autocompleter?q=${query}`);
+    if (isAvailable()) {
+      // Encrypted: the partial query never reaches the edge in clear. The reply
+      // is the [sug_prefix, results] shape, encrypted. No plaintext fallback —
+      // dropping suggestions is preferable to leaking the query.
+      const channel = await getChannel();
+      const envelope = await channel.encrypt(JSON.stringify({ q: query }));
+      const res = await fetch("./eautocompleter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(envelope)
+      });
+      if (!res.ok) throw new Error(`eautocompleter ${res.status}`);
+      results = JSON.parse(await channel.decryptText(await res.json()));
     } else {
-      res = await http("POST", "./autocompleter", { body: new URLSearchParams({ q: query }) });
+      let res: Response;
+      if (settings.method === "GET") {
+        res = await http("GET", `./autocompleter?q=${query}`);
+      } else {
+        res = await http("POST", "./autocompleter", { body: new URLSearchParams({ q: query }) });
+      }
+      results = await res.json();
     }
-
-    const results = await res.json();
 
     const autocomplete = document.querySelector<HTMLElement>(".autocomplete");
     assertElement(autocomplete);
@@ -43,7 +60,12 @@ const fetchResults = async (qInput: HTMLInputElement, query: string): Promise<vo
         qInput.value = result;
 
         const form = document.querySelector<HTMLFormElement>("#search");
-        form?.submit();
+        if (!form) return;
+        if (isAvailable()) {
+          void submitEncrypted(form).catch(() => form.submit());
+        } else {
+          form.submit();
+        }
       });
 
       fragment.append(li);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { listen } from "../toolkit.ts";
+import { encryptedSearchAvailable, restoreFromHash, submitEncrypted } from "../util/esearch.ts";
 import { getElement } from "../util/getElement.ts";
 
 const searchForm: HTMLFormElement = getElement<HTMLFormElement>("search");
@@ -61,20 +62,33 @@ for (const button of categoryButtons) {
   });
 }
 
+// Submit the form over the encrypted channel when available, falling back to a
+// native (plaintext) navigation if the channel is missing or errors.
+const routedSubmit = (): void => {
+  if (encryptedSearchAvailable()) {
+    void submitEncrypted(searchForm).catch((error) => {
+      console.error("encrypted search failed, falling back to plaintext:", error);
+      searchForm.submit();
+    });
+  } else {
+    searchForm.submit();
+  }
+};
+
 if (document.querySelector("div.search_filters")) {
   const safesearchElement = document.getElementById("safesearch");
   if (safesearchElement) {
-    listen("change", safesearchElement, () => searchForm.submit());
+    listen("change", safesearchElement, routedSubmit);
   }
 
   const timeRangeElement = document.getElementById("time_range");
   if (timeRangeElement) {
-    listen("change", timeRangeElement, () => searchForm.submit());
+    listen("change", timeRangeElement, routedSubmit);
   }
 
   const languageElement = document.getElementById("language");
   if (languageElement) {
-    listen("change", languageElement, () => searchForm.submit());
+    listen("change", languageElement, routedSubmit);
   }
 }
 
@@ -90,5 +104,9 @@ listen("submit", searchForm, (event: Event) => {
       .join(",");
   }
 
-  searchForm.submit();
+  routedSubmit();
 });
+
+// Restore results after a reload/bookmark: the browser reloads the query-less
+// URL, but the query lives in the #q=… fragment, so re-run it encrypted.
+restoreFromHash(searchForm);

@@ -6,6 +6,61 @@
 (function () {
   "use strict";
 
+  // ── End-to-end encryption helper ────────────────────────────────────────────
+  // Mirrors the tested uSearch e2e protocol exactly (P-256 ECDH + HKDF-SHA256 +
+  // AES-256-GCM). When enabled, query + response frames travel as ciphertext so
+  // the TLS-terminating edge only ever sees opaque blobs.
+  const E2E = (() => {
+    const enc = new TextEncoder(), dec = new TextDecoder();
+    const utf8 = s => enc.encode(s);
+    const SALT = utf8("usearch-e2e/v1/salt");
+    const INFO_C2S = utf8("usearch-e2e/v1/c2s");
+    const INFO_S2C = utf8("usearch-e2e/v1/s2c");
+    const b64e = b => { let s = ""; for (const x of b) s += String.fromCharCode(x); return btoa(s); };
+    const b64d = s => { const t = atob(s), o = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) o[i] = t.charCodeAt(i); return o; };
+    const cat = (a, b) => { const o = new Uint8Array(a.length + b.length); o.set(a, 0); o.set(b, a.length); return o; };
+    async function create(pubB64) {
+      const sub = crypto.subtle;
+      const pub = await sub.importKey("raw", b64d(pubB64), { name: "ECDH", namedCurve: "P-256" }, false, []);
+      const eph = await sub.generateKey({ name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]);
+      const epk = new Uint8Array(await sub.exportKey("raw", eph.publicKey));
+      const bits = await sub.deriveBits({ name: "ECDH", public: pub }, eph.privateKey, 256);
+      const hk = await sub.importKey("raw", bits, "HKDF", false, ["deriveKey"]);
+      const dk = info => sub.deriveKey({ name: "HKDF", hash: "SHA-256", salt: SALT, info }, hk, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+      const kc = await dk(cat(INFO_C2S, epk)), ks = await dk(cat(INFO_S2C, epk));
+      const epkB64 = b64e(epk);
+      return {
+        async encrypt(t) { const iv = crypto.getRandomValues(new Uint8Array(12)); const ct = new Uint8Array(await sub.encrypt({ name: "AES-GCM", iv }, kc, utf8(t))); return { epk: epkB64, iv: b64e(iv), ct: b64e(ct) }; },
+        async decrypt(f) { const pt = await sub.decrypt({ name: "AES-GCM", iv: b64d(f.iv) }, ks, b64d(f.ct)); return dec.decode(pt); }
+      };
+    }
+    return { create };
+  })();
+
+  // Read the published static server public key from page settings — mirrors
+  // client/simple/src/js/toolkit.ts getSettings().
+  function getPubKey() {
+    try {
+      const el = document.querySelector("script[client_settings]");
+      if (!el) return null;
+      const settings = JSON.parse(atob(el.getAttribute("client_settings")));
+      return settings && settings.e2e_pubkey ? settings.e2e_pubkey : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // One channel per page, lazily created and memoized. The server is stateless,
+  // so this ephemeral channel is independent of the rest of the page.
+  let _channelPromise = null;
+  function getChannel() {
+    if (_channelPromise) return _channelPromise;
+    const pubkey = getPubKey();
+    if (!pubkey || !(window.crypto && crypto.subtle)) return null;
+    _channelPromise = E2E.create(pubkey);
+    return _channelPromise;
+  }
+
   const CSS = `
     #ai-summary-wrapper {
       /* Positioned directly in body, before #main_results.
@@ -301,6 +356,25 @@
   // Handles both true streaming AND nginx-buffered (all-at-once) delivery.
   // Robustly strips \r, BOM, and other proxy artifacts before JSON.parse.
 
+  // Interpret one SSE payload string (the text after `data: `, already
+  // decrypted in the encrypted path). Returns true if it was the [DONE]
+  // sentinel (caller should stop). Identical handling for both transports.
+  function handlePayload(raw, onChunk, onDone) {
+    if (!raw || raw === "[DONE]") {
+      if (raw === "[DONE]") { onDone(); return true; }
+      return false;
+    }
+    // Try JSON.parse — the value should be a quoted string like "Hello"
+    try {
+      const txt = JSON.parse(raw);
+      if (typeof txt === "string" && txt) onChunk(txt);
+    } catch (_) {
+      // Proxy might strip JSON quotes and send raw text — use as-is
+      if (raw && raw !== "[DONE]") onChunk(raw);
+    }
+    return false;
+  }
+
   async function readStream(url, body, onChunk, onDone, onError) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 s timeout
@@ -332,21 +406,7 @@
           // Strip carriage returns and BOM that proxies sometimes add
           const t = line.replace(/\r/g, "").trim();
           if (!t.startsWith("data:")) continue;
-
-          const raw = t.slice(5).trim();
-          if (!raw || raw === "[DONE]") {
-            if (raw === "[DONE]") { onDone(); return; }
-            continue;
-          }
-
-          // Try JSON.parse — the value should be a quoted string like "Hello"
-          try {
-            const txt = JSON.parse(raw);
-            if (typeof txt === "string" && txt) onChunk(txt);
-          } catch (_) {
-            // Proxy might strip JSON quotes and send raw text — use as-is
-            if (raw && raw !== "[DONE]") onChunk(raw);
-          }
+          if (handlePayload(t.slice(5).trim(), onChunk, onDone)) return;
         }
       }
       onDone();
@@ -355,6 +415,97 @@
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  // ── Encrypted SSE stream reader ────────────────────────────────────────────
+  // POSTs an encrypted {q} envelope, reads the streamed response body, splits it
+  // into SSE events, decrypts each `data: {iv,ct}` frame back to the ORIGINAL
+  // plaintext payload string, then feeds it through the SAME handlePayload path.
+  async function readStreamEncrypted(url, channel, query, onChunk, onDone, onError) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 s timeout
+    try {
+      const envelope = await channel.encrypt(JSON.stringify({ q: query || "" }));
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+        body: JSON.stringify(envelope),
+        signal: controller.signal,
+      });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder("utf-8");
+      let buf = "";
+
+      // Split on blank-line event boundaries; buffer partial frames across reads.
+      async function flush(force) {
+        while (true) {
+          const idx = buf.indexOf("\n\n");
+          if (idx === -1) {
+            if (!force) break;
+            // On final flush, treat the remainder as a last (possibly
+            // boundary-less) event so nothing is dropped.
+            const tail = buf; buf = "";
+            if (!tail) break;
+            if (await processEvent(tail)) return true;
+            break;
+          }
+          const event = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          if (await processEvent(event)) return true;
+        }
+        return false;
+      }
+
+      async function processEvent(event) {
+        for (const line of event.split("\n")) {
+          const t = line.replace(/\r/g, "").trim();
+          if (!t.startsWith("data:")) continue;
+          const raw = t.slice(5).trim();
+          if (!raw) continue;
+          let payload;
+          try {
+            payload = await channel.decrypt(JSON.parse(raw));
+          } catch (_) {
+            continue; // skip undecryptable / malformed frame
+          }
+          if (handlePayload(payload, onChunk, onDone)) return true;
+        }
+        return false;
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        if (await flush(false)) return;
+      }
+      if (await flush(true)) return;
+      onDone();
+    } catch (err) {
+      onError(err);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  // Dispatcher: use the encrypted POST transport when a channel is available,
+  // otherwise fall back to the plaintext EventSource-style GET transport so the
+  // feature keeps working in dev / unencrypted deployments.
+  // `eUrl` is the encrypted route, `url` the plaintext one.
+  async function requestSummary(url, eUrl, query, onChunk, onDone, onError) {
+    let channel = null;
+    try {
+      const p = getChannel();
+      if (p) channel = await p;
+    } catch (_) {
+      channel = null; // channel setup failed → fall back to plaintext
+    }
+    if (channel) {
+      return readStreamEncrypted(eUrl, channel, query, onChunk, onDone, onError);
+    }
+    return readStream(url, { query: query }, onChunk, onDone, onError);
   }
 
   // ── Code block renderer ───────────────────────────────────────────────────
@@ -673,9 +824,10 @@
       timerID = setTimeout(tick, 16);
     }
 
-    readStream(
+    requestSummary(
       "/ai_summary",
-      { query, results: results.slice(0, 5) },
+      "/eai_summary",
+      query,
       (chunk) => {
         // Cache hit: first token is the sentinel, second is the full text
         if (chunk === "[CACHED]") { fromCache = true; return; }
@@ -721,9 +873,10 @@
     let buffer = "", firstChunk = true;
     const update = makeProgressiveRenderer(panel, results);
 
-    readStream(
+    requestSummary(
       "/ai_summary_more",
-      { query: getQuery(), results: results.slice(0, 5) },
+      "/eai_summary_more",
+      getQuery(),
       (chunk) => {
         buffer += chunk;
         if (firstChunk) { firstChunk = false; if (initSpinner.parentNode) initSpinner.remove(); panel.appendChild(genBar); }

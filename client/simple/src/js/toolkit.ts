@@ -8,6 +8,7 @@ type Settings = {
   autocomplete?: string;
   autocomplete_min?: number;
   doi_resolver?: string;
+  e2e_pubkey?: string;
   favicon_resolver?: string;
   hotkeys?: KeyBindingLayout;
   method?: "GET" | "POST";
