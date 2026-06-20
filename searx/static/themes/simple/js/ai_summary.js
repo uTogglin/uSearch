@@ -582,13 +582,38 @@
     return null;
   }
 
+  // Snapshot the favicon currently shown for each result host, read fresh from
+  // the live DOM. Result favicons are resolved ASYNCHRONOUSLY after page load by
+  // the batched resolver (see favicons.ts) — a cache miss starts as a placeholder
+  // globe and is swapped to the real icon a moment later. collectResults() runs at
+  // page load, so its snapshot captures placeholders; reading again here (the box
+  // is built only after the user clicks "Show AI summary") picks up the resolved
+  // icons. Keyed by host, first result per host wins.
+  function liveFaviconByHost() {
+    const map = new Map();
+    document.querySelectorAll(".result").forEach((el) => {
+      const a = el.querySelector("h3 a") || el.querySelector("a");
+      const img = el.querySelector(".favicon img");
+      if (!a || !img) return;
+      const host = hostnameOf(a.href || "");
+      const src = img.currentSrc || img.src || "";
+      if (host && src && !map.has(host)) map.set(host, src);
+    });
+    return map;
+  }
+
   // Build the "Sources" block — the result pages the model was given.
   // Mirrors the top results sent server-side (max_results, default 5).
   // Built from DOM nodes (no innerHTML) so adversarial titles/URLs can't inject.
   function buildSources(results) {
     const AI_MAX_SOURCES = 5;
+    const live = liveFaviconByHost();
     const items = (results || []).slice(0, AI_MAX_SOURCES)
-      .map((r) => ({ url: safeHttpUrl(r && r.url), title: (r && r.title) || "", favicon: (r && r.favicon) || "" }))
+      .map((r) => {
+        const url = safeHttpUrl(r && r.url);
+        const liveFav = url ? live.get(hostnameOf(url)) : "";
+        return { url, title: (r && r.title) || "", favicon: liveFav || (r && r.favicon) || "" };
+      })
       .filter((r) => r.url);
     if (!items.length) return null;
 

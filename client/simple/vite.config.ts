@@ -57,6 +57,44 @@ export default {
 
       // file naming conventions / pathnames are relative to outDir (PATH.dist)
       output: {
+        // Coalesce the many tiny per-module chunks the router dynamic-imports
+        // (~9 files = ~9 edge-Worker requests on a cold results page) into two,
+        // WITHOUT changing evaluation semantics. A chunk evaluates every module
+        // it contains as soon as anything imports it, and the main/* controllers
+        // run unguarded top-level DOM assertions (e.g. search.ts does
+        // getElement("search"), which throws when absent) — so what may share a
+        // chunk is constrained by which endpoints load it:
+        //
+        //   • "app" — the controllers loaded ONLY on the index/results endpoints
+        //     (both of which have #search) plus the InfiniteScroll plugin (a
+        //     side-effect-free class). Safe to co-evaluate; never imported by the
+        //     preferences page.
+        //   • "util" — the side-effect-free helpers. preferences.ts imports these,
+        //     so they MUST stay out of "app" (else loading preferences would
+        //     evaluate search.ts and throw).
+        //
+        // includeDependenciesRecursively:false keeps each group to its matched
+        // modules so the shared toolkit isn't dragged in — that would make core
+        // statically import "app" and evaluate the controllers on every page.
+        // The heavy on-demand plugins are intentionally unmatched and stay lazy:
+        // MapView (~324KB, OpenLayers) and Calculator (~146KB, mathjs).
+        codeSplitting: {
+          includeDependenciesRecursively: false,
+          groups: [
+            {
+              name: "app",
+              test: /src[\\/]js[\\/](main[\\/](keyboard|results|search|autocomplete|favicons)|plugin[\\/]InfiniteScroll)\.ts$/,
+              minSize: 0,
+              priority: 100
+            },
+            {
+              name: "util",
+              test: /src[\\/]js[\\/]util[\\/]/,
+              minSize: 0,
+              priority: 50
+            }
+          ]
+        },
         entryFileNames: "sxng-[name].min.js",
         chunkFileNames: "chunk/[hash].min.js",
         assetFileNames: ({ names }: PreRenderedAsset): string => {

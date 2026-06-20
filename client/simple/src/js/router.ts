@@ -57,6 +57,11 @@ ready(
     if (settings.autocomplete) {
       void import("./main/autocomplete.ts");
     }
+
+    // Always load — the module self-gates on the presence of placeholder favicon
+    // <img>s in the DOM (rendered by the template), which is a more reliable
+    // signal than settings.favicon_resolver (null for stale-cookie sessions).
+    void import("./main/favicons.ts");
   },
   { on: [endpoint === Endpoints.results] }
 );

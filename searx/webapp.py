@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import base64
+import hashlib
 
 from timeit import default_timer
 from html import escape
@@ -297,6 +298,47 @@ def custom_url_for(endpoint: str, **values):
     return url_for(endpoint, **values)
 
 
+_STATIC_HASH_CACHE: "dict[str, str]" = {}
+
+
+def static_hash(filename: str) -> str:
+    """Short content hash to cache-bust a stable-named static asset.
+
+    The bundle entry points (``sxng-core.min.js``, ``sxng-*.min.css``) keep the
+    same filename across builds, so the Cloudflare edge keeps serving the old
+    copy for up to its ``max-age`` after a deploy — the symptom being a new HTML
+    page that still pulls a stale, hashed-chunk-mismatched core. Appending
+    ``?h=<hash>`` gives every build a fresh URL the edge has never cached. The
+    content-hashed chunk files don't need this; only these stable entries do.
+    Computed once per file per process (a deploy restarts the process); returns
+    an empty string if the file can't be read (the URL then just omits the tag)."""
+    cached = _STATIC_HASH_CACHE.get(filename)
+    if cached is not None:
+        return cached
+
+    global _STATIC_FILES  # pylint: disable=global-statement
+    if not _STATIC_FILES:
+        _STATIC_FILES = webutils.get_static_file_list()
+
+    # Mirror custom_url_for's theme resolution so we hash the file actually served.
+    resolved = filename
+    if resolved not in _STATIC_FILES:
+        theme_name = sxng_request.preferences.get_value("theme")
+        theme_filename = f"themes/{theme_name}/{filename}"
+        if theme_filename in _STATIC_FILES:
+            resolved = theme_filename
+
+    digest = ''
+    try:
+        path = os.path.join(app.root_path, settings['ui']['static_path'], resolved)
+        with open(path, 'rb') as f:
+            digest = hashlib.md5(f.read()).hexdigest()[:10]
+    except OSError:
+        pass
+    _STATIC_HASH_CACHE[filename] = digest
+    return digest
+
+
 def image_proxify(url: str):
     if not url:
         return url
@@ -472,6 +514,9 @@ def render(template_name: str, **kwargs):
     kwargs['url_for'] = custom_url_for  # override url_for function in templates
     kwargs['image_proxify'] = image_proxify
     kwargs['favicon_url'] = favicons.favicon_url
+    kwargs['favicon_cached_data_url'] = favicons.favicon_cached_data_url
+    kwargs['favicon_placeholder'] = favicons.favicon_placeholder
+    kwargs['static_hash'] = static_hash
     kwargs['cache_url'] = settings['ui']['cache_url']
     kwargs['get_result_template'] = get_result_template
     kwargs['opensearch_url'] = (
@@ -970,6 +1015,60 @@ def eautocompleter():
 
     suggestions, _ = _run_autocompleter(query, xhr=False)
     return jsonify(session.encrypt(suggestions))
+
+
+# Resolving favicons one HTTP request per result floods the edge Worker (and, on
+# the encrypted instance, leaks every visited domain in a plaintext URL). These
+# routes resolve a whole results page worth of favicons in a SINGLE request.
+FAVICON_BATCH_MAX = 64
+
+
+def _resolve_favicons(authorities) -> "dict[str, str]":
+    """Map each ``authority`` (RFC 3986 netloc) to an inline favicon data URL.
+
+    Deduplicated and capped at :data:`FAVICON_BATCH_MAX`; malformed entries are
+    skipped. Cache-aware and resolves cache misses concurrently via
+    :func:`favicons.favicon_data_url_batch`, so a results page is bound by the
+    slowest single resolver round-trip rather than the sum of them all."""
+    if not isinstance(authorities, list):
+        return {}
+    return favicons.favicon_data_url_batch(authorities, FAVICON_BATCH_MAX)
+
+
+@app.route('/favicon_batch', methods=['POST'])
+def favicon_batch():
+    """Resolve many result favicons in one request.
+
+    Body: JSON ``{"authorities": ["example.com", ...]}``.
+    Reply: JSON ``{"icons": {"example.com": "data:...", ...}}``.
+
+    Collapses what used to be one ``/favicon_proxy`` GET per result into a single
+    round-trip — far fewer edge Worker invocations per search."""
+    body = sxng_request.get_json(silent=True) or {}
+    return jsonify({'icons': _resolve_favicons(body.get('authorities', []))})
+
+
+@app.route('/efavicon_batch', methods=['POST'])
+def efavicon_batch():
+    """Encrypted favicon batch.
+
+    Body is an ``{epk, iv, ct}`` envelope whose plaintext is JSON
+    ``{"authorities": [...]}``; the reply ``{"icons": {...}}`` is encrypted back.
+    Keeps the result domains off the Cloudflare edge (the plaintext
+    ``/favicon_proxy`` URLs would otherwise reveal them)."""
+    if not echannel.is_enabled():
+        flask.abort(404)
+    body = sxng_request.get_json(silent=True)
+    try:
+        plaintext, session = echannel.open_request(body)
+    except echannel.EChannelError:
+        flask.abort(400)
+    try:
+        authorities = json.loads(plaintext.decode('utf-8')).get('authorities', [])
+    except (ValueError, AttributeError):
+        flask.abort(400)
+    icons = _resolve_favicons(authorities)
+    return jsonify(session.encrypt(json.dumps({'icons': icons})))
 
 
 @app.route('/preferences', methods=['GET', 'POST'])
@@ -1501,8 +1600,22 @@ def init():
     limiter.initialize(app, settings)
 
 
-def static_headers(headers: Headers, _path: str, _url: str) -> None:
-    headers['Cache-Control'] = 'public, max-age=30, stale-while-revalidate=60'
+def static_headers(headers: Headers, path: str, _url: str) -> None:
+    # Every static asset is proxied through the edge Worker, and with a short
+    # max-age the browser revalidates each one (conditional GET -> 304) on every
+    # search — ~20 Worker invocations per search just for the JS/CSS bundle. The
+    # bundle assets are content-addressed two ways, so their URL changes whenever
+    # their bytes do: hashed chunk filenames (chunk/<hash>.min.js) and the stable
+    # entry points cache-busted by a ?h= query in the template (see static_hash).
+    # Both can therefore be cached immutably — the browser then serves them from
+    # disk with NO network request until a deploy mints a new URL, removing them
+    # from the per-search Worker count entirely. Everything else (favicons,
+    # fonts, images referenced by a stable path) keeps a moderate TTL so it can
+    # still update without a redeploy, while no longer revalidating per search.
+    if path.endswith('.min.js') or path.endswith('.min.css'):
+        headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    else:
+        headers['Cache-Control'] = 'public, max-age=86400, stale-while-revalidate=604800'
 
     for header, value in settings['server']['default_http_headers'].items():
         # cast value to string, as WhiteNoise requires header values to be strings

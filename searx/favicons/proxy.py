@@ -3,6 +3,7 @@
 
 
 from typing import Callable
+from concurrent.futures import ThreadPoolExecutor
 
 import importlib
 import base64
@@ -235,3 +236,129 @@ def favicon_url(authority: str) -> str:
     proxy_url = flask.url_for('favicon_proxy')
     query = urllib.parse.urlencode({"authority": authority, "h": h})
     return f"{proxy_url}?{query}"
+
+
+def favicon_cached_data_url(authority: str) -> str | None:
+    """Inline favicon data URL for ``authority`` *iff* it needs no network request.
+
+    Returns a ``data:`` URL when the resolver result is already known — a cached
+    positive (the real icon) or a cached negative (the empty placeholder) — and
+    ``None`` on a genuine cache miss, where resolving would mean a blocking
+    resolver round-trip.
+
+    This lets the template inline every already-known favicon straight into the
+    search HTML. On a warm instance that resolves a whole results page with no
+    extra request at all, dropping the ``/favicon_batch`` round-trip (and the
+    edge Worker invocation it costs) entirely; only genuinely-unknown domains keep
+    the placeholder + ``data-favicon-authority`` slot the client batch fills in.
+    The cache is populated by that very batch, so coverage grows on its own. The
+    server render never blocks on a resolver, so there is no latency cost."""
+    resolver = sxng_request.preferences.get_value('favicon_resolver') or get_setting(  # type: ignore
+        'search.favicon_resolver', ''
+    )
+    if not resolver or resolver not in CFG.resolver_map.keys():
+        return None
+
+    data_mime = cache.CACHE(resolver, authority)
+    if data_mime is None:
+        # genuine cache miss — inlining would require a resolver round-trip
+        return None
+    if data_mime == (None, None):
+        # cached negative: known to have no icon → inline the empty placeholder
+        theme = sxng_request.preferences.get_value("theme")  # type: ignore
+        return CFG.favicon_data_url(theme=theme)
+    data, mime = data_mime
+    return f"data:{mime};base64,{str(base64.b64encode(data), 'utf-8')}"  # type: ignore
+
+
+def favicon_placeholder() -> str:
+    """The default (empty) favicon as an inline data URL.
+
+    Used as the initial ``src`` of every result favicon so the page never fires
+    a per-result network request just to show an icon; the real favicons are
+    swapped in afterwards by a single batched call (see :py:obj:`favicon_data_url`
+    and the ``/favicon_batch`` route)."""
+    theme = sxng_request.preferences.get_value("theme")  # type: ignore
+    return CFG.favicon_data_url(theme=theme)
+
+
+def favicon_data_url(authority: str) -> str:
+    """Resolve the favicon for ``authority`` and return it as an inline data URL.
+
+    Cache-aware exactly like :py:obj:`favicon_url` (a hit returns instantly, a
+    miss resolves via the configured resolver and is then cached), but it *always*
+    inlines — it never emits a ``/favicon_proxy`` route. That lets a results page
+    resolve every favicon in ONE batched request instead of one HTTP round-trip
+    per result, and keeps the visited domains out of any plaintext URL the
+    Cloudflare edge could read. Falls back to the placeholder when the resolver
+    has no icon."""
+    # Fall back to the instance's configured resolver when the per-user preference
+    # is unset (None). A stale preferences cookie from before the favicon feature
+    # leaves the preference empty, which would otherwise return placeholders for
+    # everyone but a fresh session — even though the template still renders the
+    # favicon slots (Jinja treats ``None != ""`` as true).
+    resolver = sxng_request.preferences.get_value('favicon_resolver') or get_setting(  # type: ignore
+        'search.favicon_resolver', ''
+    )
+    if not resolver or resolver not in CFG.resolver_map.keys():
+        return favicon_placeholder()
+
+    data, mime = search_favicon(resolver, authority)
+    if data is not None and mime is not None:
+        return f"data:{mime};base64,{str(base64.b64encode(data), 'utf-8')}"  # type: ignore
+    return favicon_placeholder()
+
+
+# Resolving a results page worth of favicons one after another means paying one
+# blocking resolver round-trip (up to ``resolver_timeout`` each) per cache miss,
+# in series — a page of uncached domains takes N timeouts back to back. The batch
+# below resolves the misses concurrently, so wall-clock collapses to roughly a
+# single round-trip regardless of how many domains miss the cache.
+FAVICON_BATCH_WORKERS = 16
+
+
+def favicon_data_url_batch(authorities: "list[str]", max_count: int) -> "dict[str, str]":
+    """Resolve favicons for many ``authorities`` in one call → ``{authority: data_url}``.
+
+    Equivalent to calling :py:obj:`favicon_data_url` per authority, but cache
+    *misses* are resolved concurrently instead of in series, so the page is bound
+    by the slowest single resolver round-trip rather than their sum. Cache hits and
+    the placeholder fallback do no network work.
+
+    Input is validated, de-duplicated and capped at ``max_count``. Must run inside
+    a Flask request context: the per-user resolver and theme preferences are read
+    once, up front, before any worker thread starts (worker threads have no request
+    context, so only :py:obj:`search_favicon` — cache + network — is handed off)."""
+
+    # Read request-context-bound state once, in the calling (request) thread.
+    resolver = sxng_request.preferences.get_value('favicon_resolver') or get_setting(  # type: ignore
+        'search.favicon_resolver', ''
+    )
+    placeholder = favicon_placeholder()
+
+    todo: "list[str]" = []
+    seen: "set[str]" = set()
+    for authority in authorities:
+        if len(todo) >= max_count:
+            break
+        if not isinstance(authority, str) or not authority or "/" in authority or authority in seen:
+            continue
+        seen.add(authority)
+        todo.append(authority)
+
+    if not todo:
+        return {}
+
+    if not resolver or resolver not in CFG.resolver_map.keys():
+        return {authority: placeholder for authority in todo}
+
+    def resolve(authority: str) -> str:
+        data, mime = search_favicon(resolver, authority)
+        if data is not None and mime is not None:
+            return f"data:{mime};base64,{str(base64.b64encode(data), 'utf-8')}"  # type: ignore
+        return placeholder
+
+    # The cache (per-thread SQLite connection) and searx.network (dispatches to a
+    # shared background event loop) are both safe to call from worker threads.
+    with ThreadPoolExecutor(max_workers=min(FAVICON_BATCH_WORKERS, len(todo))) as pool:
+        return dict(zip(todo, pool.map(resolve, todo)))

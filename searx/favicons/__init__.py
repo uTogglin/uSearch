@@ -9,12 +9,27 @@ an example in which the command line is called in the development environment::
 """
 
 
-__all__ = ["init", "favicon_url", "favicon_proxy"]
+__all__ = [
+    "init",
+    "favicon_url",
+    "favicon_proxy",
+    "favicon_data_url",
+    "favicon_data_url_batch",
+    "favicon_cached_data_url",
+    "favicon_placeholder",
+]
 
 import pathlib
 from searx import logger
 from searx import get_setting
-from .proxy import favicon_url, favicon_proxy
+from .proxy import (
+    favicon_url,
+    favicon_proxy,
+    favicon_data_url,
+    favicon_data_url_batch,
+    favicon_cached_data_url,
+    favicon_placeholder,
+)
 
 logger = logger.getChild('favicons')
 

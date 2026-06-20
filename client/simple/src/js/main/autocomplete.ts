@@ -5,31 +5,49 @@ import { assertElement } from "../util/assertElement.ts";
 import { getChannel, isAvailable } from "../util/echannel.ts";
 import { submitEncrypted } from "../util/esearch.ts";
 
+// Cache suggestions per query so backspacing/retyping an already-seen prefix
+// costs zero requests, and keep at most one autocomplete request in flight —
+// each new keystroke cancels the previous one. Both cut edge Worker invocations.
+const cache = new Map<string, [string, string[]]>();
+let inFlight: AbortController | null = null;
+
 const fetchResults = async (qInput: HTMLInputElement, query: string): Promise<void> => {
   try {
     let results: [string, string[]];
 
-    if (isAvailable()) {
-      // Encrypted: the partial query never reaches the edge in clear. The reply
-      // is the [sug_prefix, results] shape, encrypted. No plaintext fallback —
-      // dropping suggestions is preferable to leaking the query.
-      const channel = await getChannel();
-      const envelope = await channel.encrypt(JSON.stringify({ q: query }));
-      const res = await fetch("./eautocompleter", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(envelope)
-      });
-      if (!res.ok) throw new Error(`eautocompleter ${res.status}`);
-      results = JSON.parse(await channel.decryptText(await res.json()));
+    const cached = cache.get(query);
+    if (cached) {
+      results = cached;
     } else {
-      let res: Response;
-      if (settings.method === "GET") {
-        res = await http("GET", `./autocompleter?q=${query}`);
+      inFlight?.abort();
+      const controller = new AbortController();
+      inFlight = controller;
+
+      if (isAvailable()) {
+        // Encrypted: the partial query never reaches the edge in clear. The reply
+        // is the [sug_prefix, results] shape, encrypted. No plaintext fallback —
+        // dropping suggestions is preferable to leaking the query.
+        const channel = await getChannel();
+        const envelope = await channel.encrypt(JSON.stringify({ q: query }));
+        const res = await fetch("./eautocompleter", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(envelope),
+          signal: controller.signal
+        });
+        if (!res.ok) throw new Error(`eautocompleter ${res.status}`);
+        results = JSON.parse(await channel.decryptText(await res.json()));
       } else {
-        res = await http("POST", "./autocompleter", { body: new URLSearchParams({ q: query }) });
+        let res: Response;
+        if (settings.method === "GET") {
+          res = await http("GET", `./autocompleter?q=${query}`);
+        } else {
+          res = await http("POST", "./autocompleter", { body: new URLSearchParams({ q: query }) });
+        }
+        results = await res.json();
       }
-      results = await res.json();
+
+      cache.set(query, results);
     }
 
     const autocomplete = document.querySelector<HTMLElement>(".autocomplete");
@@ -73,6 +91,8 @@ const fetchResults = async (qInput: HTMLInputElement, query: string): Promise<vo
 
     autocompleteList.append(fragment);
   } catch (error) {
+    // A superseded request was aborted by a newer keystroke — not an error.
+    if ((error as Error)?.name === "AbortError") return;
     console.error("Error fetching autocomplete results:", error);
   }
 };
@@ -94,7 +114,7 @@ listen("input", qInput, () => {
     if (query === qInput.value) {
       await fetchResults(qInput, query);
     }
-  }, 300);
+  }, 400);
 });
 
 const autocomplete: HTMLElement | null = document.querySelector<HTMLElement>(".autocomplete");

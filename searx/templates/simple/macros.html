@@ -22,7 +22,11 @@
 <article class="result {% if result['template'] %}result-{{ result.template|replace('.html', '') }}{% else %}result-default{% endif %} {% if result['category'] %}category-{{ result['category'] }}{% endif %}">
   {{- result_open_link(result.url, "url_header") -}}
   {%- if favicon_resolver != "" %}
-  <div class="favicon"><img loading="lazy" src="{{ favicon_url(result.parsed_url.netloc) }}"></div>
+  {#- Inline favicons already in the server cache; only true misses keep the
+      data-favicon-authority slot the client batch resolves. A warm instance thus
+      renders every icon with zero extra requests (no /favicon_batch round-trip). -#}
+  {%- set fav_inline = favicon_cached_data_url(result.parsed_url.netloc) -%}
+  <div class="favicon"><img class="favicon-img" loading="lazy" src="{{ fav_inline or favicon_placeholder() }}"{% if not fav_inline %} data-favicon-authority="{{ result.parsed_url.netloc }}"{% endif %}><noscript><img loading="lazy" src="{{ favicon_url(result.parsed_url.netloc) }}"></noscript></div>
   {%- endif -%}
   <div class="url_header_text">
     <span class="site_name">{{ get_result_site_name(result.parsed_url) }}</span>
