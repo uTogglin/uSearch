@@ -71,9 +71,33 @@ _NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]{1,100}$")
 # Reddit thread (base36) post id, e.g. /r/python/comments/1abcdef/...
 _REDDIT_ID_RE = re.compile(r"^[A-Za-z0-9]{4,12}$")
 
+# Hostname safe to drop into an HTML attribute (defends the injected tag).
+_HOST_ATTR_RE = re.compile(r"^[a-z0-9.-]+$")
+
 
 def _setting(key: str, default=None):
     return get_setting(f"card_meta.{key}", default)
+
+
+def _reddit_frontend_hosts() -> set:
+    """Hosts to treat as Reddit threads.
+
+    Always ``reddit.com``.  When the ``privacy_redirect`` plugin is configured
+    to send Reddit through a privacy frontend (redlib/libreddit/teddit …), a
+    result URL gets rewritten ``reddit.com`` → ``<redlib>`` *before* it reaches
+    the page, so the card_meta detection (and the top "sources" card) would no
+    longer recognise it.  We add the configured frontend host here and reverse
+    -map it to Reddit's public JSON — those frontends keep the
+    ``/r/<sub>/comments/<id>`` path verbatim, so the post id still extracts."""
+    hosts = {"reddit.com"}
+    base = ((get_setting("privacy_redirect", {}) or {}).get("redlib") or "").strip()
+    if base:
+        h = (urlsplit(base).hostname or "").lower().lstrip(".")
+        if h.startswith("www."):
+            h = h[4:]
+        if h:
+            hosts.add(h)
+    return hosts
 
 
 # ── In-memory TTL cache ───────────────────────────────────────────────────────
@@ -161,8 +185,9 @@ def _classify(raw_url: str):
             key = f"gh:{owner.lower()}/{repo.lower()}"
             return ("github", key, lambda: _fetch_github(owner, repo))
 
-    # Reddit thread: reddit.com/r/<sub>/comments/<id>/...  (also /comments/<id>)
-    if host == "reddit.com" or host.endswith(".reddit.com"):
+    # Reddit thread: reddit.com/r/<sub>/comments/<id>/...  (also /comments/<id>).
+    # Privacy-frontend hosts (redlib …) keep the same path, so they map here too.
+    if host in _reddit_frontend_hosts() or host.endswith(".reddit.com"):
         if "comments" in segs:
             i = segs.index("comments")
             if i + 1 < len(segs) and _REDDIT_ID_RE.match(segs[i + 1]):
@@ -302,8 +327,16 @@ class SXNGPlugin(Plugin):
                 if 'id="results"' not in body and "id='results'" not in body:
                     return response
                 _v = str(int(time.time() // 60))
+                # Hand the client the Reddit privacy-frontend host(s) so it can
+                # still classify result links the Privacy redirect rewrote.
+                extra = sorted(_reddit_frontend_hosts() - {"reddit.com"})
+                attr = ""
+                if extra:
+                    safe = ",".join(h for h in extra if _HOST_ATTR_RE.match(h))
+                    if safe:
+                        attr = f' data-reddit-frontends="{safe}"'
                 script = ('\n<script src="/static/themes/simple/js/serp_enhance.js'
-                          f'?v={_v}"></script>')
+                          f'?v={_v}"{attr}></script>')
                 body = body.replace("</body>", script + "\n</body>")
                 response.set_data(body)
             except Exception as exc:  # noqa: BLE001

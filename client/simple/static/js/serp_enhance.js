@@ -18,6 +18,23 @@
 (function () {
   "use strict";
 
+  // Reddit privacy-frontend hosts (e.g. redlib) the card_meta plugin injects
+  // from the privacy_redirect setting. A result URL the Privacy redirect
+  // rewrote (reddit.com → redlib…) is still recognised as a Reddit thread, so
+  // it keeps its place in the top "sources" card. reddit.com is always known.
+  const REDDIT_HOSTS = (function () {
+    const set = new Set(["reddit.com"]);
+    try {
+      const s = document.querySelector('script[src*="serp_enhance.js"]');
+      const raw = s && s.getAttribute("data-reddit-frontends");
+      if (raw) raw.split(",").forEach((h) => {
+        h = h.trim().toLowerCase().replace(/^www\./, "");
+        if (h) set.add(h);
+      });
+    } catch (_) { /* ignore */ }
+    return set;
+  })();
+
   // ── Styles ─────────────────────────────────────────────────────────────────
   const CSS = `
     .serp-copy-btn {
@@ -246,7 +263,7 @@
     }
 
     const REDDIT_ID = /^[A-Za-z0-9]{4,12}$/;
-    if (host === "reddit.com" || host.endsWith(".reddit.com")) {
+    if (REDDIT_HOSTS.has(host) || host.endsWith(".reddit.com")) {
       const ci = segs.indexOf("comments");
       if (ci >= 0 && ci + 1 < segs.length && REDDIT_ID.test(segs[ci + 1])) {
         return "reddit";
