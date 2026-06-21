@@ -263,6 +263,9 @@ plugins:
   searx.plugins.privacy_redirect.SXNGPlugin:
     active: true
 
+  searx.plugins.youtube_redirect.SXNGPlugin:
+    active: false
+
   searx.plugins.ai_summary.SXNGPlugin:
     active: true
 
@@ -291,6 +294,16 @@ privacy_redirect:
   librarian:  "https://librarian.pussthecat.org"   # Odysee
   wikiless:   "https://wikiless.org"               # Wikipedia
   breezewiki: "https://breezewiki.com"             # Fandom / Wikia
+
+
+# Configuration of the "YouTube redirect plugin":
+#
+# Rewrites YouTube / youtu.be result links so they open through an Invidious
+# frontend instead. Separate from privacy_redirect (which leaves YouTube alone)
+# so it can be toggled independently in the Privacy tab. Leave "invidious" empty
+# ("") to disable the redirect without disabling the plugin.
+youtube_redirect:
+  invidious: "https://yewtu.be"
 
 
 # Configuration of the "Card Meta plugin" (GitHub / Reddit result cards):
