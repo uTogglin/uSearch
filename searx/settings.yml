@@ -274,6 +274,9 @@ plugins:
   searx.plugins.card_meta.SXNGPlugin:
     active: true
 
+  searx.plugins.watch_offers.SXNGPlugin:
+    active: true
+
 
 # Configuration of the "Privacy redirect plugin":
 #
@@ -325,6 +328,24 @@ card_meta:
   github_token: ""
 
 
+# Configuration of the "Watch Offers plugin" ("Where to watch" box):
+#
+# For film/TV queries, queries JustWatch server-side and renders a compact box
+# (top of the results column, where the Reddit "sources" card sits) listing
+# where to stream / rent / buy the title, cheapest-first, in the local currency.
+# JustWatch's public GraphQL endpoint is free; offers change slowly, so we cache
+# aggressively. The browser only ever talks to this origin (privacy-preserving),
+# and provider logos are not loaded (no third-party requests).
+watch_offers:
+  timeout: 6                # upstream request timeout (seconds)
+  cache_ttl: 21600          # cache offers for 6 hours
+  cache_max: 1000           # max cached entries
+  max_offers: 12            # max offer rows returned to the client
+  default_region: GB        # ISO-3166 alpha-2 fallback when no locale is present
+  rate_limit_capacity: 15   # per-IP burst size
+  rate_limit_rate: 1.0      # per-IP tokens refilled per second
+
+
 # Configuration of the "AI Summary plugin" (OpenRouter):
 #
 # Streams an AI-generated overview above the search results, powered by
@@ -355,7 +376,42 @@ ai_summary:
   # response_cache_path: "/var/cache/searxng/ai_summary_cache.db"
 
 
-# Configuration of the "Hostnames plugin":
+# Result-quality tuning via the "Hostnames plugin" (active above).
+# SearXNG ranks purely by cross-engine position consensus -- it has no concept of
+# domain authority or query relevance. That lets print-on-demand / merch shops
+# (which spam every entity & media query and show up in several engines) outrank
+# the actual official / reference result. We correct that here:
+#   low_priority  -> result.priority = "low"  -> score forced to 0 (sinks to bottom)
+#   high_priority -> result.priority = "high" -> score += weight (un-divided, strong boost)
+# Trade-off: low_priority is harsh (zeroes the score), so genuine shopping-intent
+# queries will see these stores demoted too. Acceptable for a general/media search;
+# extend the lists below as new offenders show up.
+hostnames:
+  low_priority:
+    # poster / print-on-demand / merch / general retail clutter
+    - '(.*\.)?posterstore\.[a-z.]+$'
+    - '(.*\.)?zavvi\.[a-z.]+$'
+    - '(.*\.)?redbubble\.com$'
+    - '(.*\.)?teepublic\.com$'
+    - '(.*\.)?displate\.com$'
+    - '(.*\.)?society6\.com$'
+    - '(.*\.)?merchbar\.com$'
+    - '(.*\.)?etsy\.com$'
+    - '(.*\.)?ebay\.[a-z.]+$'
+    - '(.*\.)?aliexpress\.[a-z.]+$'
+    - '(.*\.)?wallart\.[a-z.]+$'
+    - '(.*\.)?fruugo\.[a-z.]+$'
+  high_priority:
+    # authoritative reference / info domains (incl. the privacy-frontend proxies
+    # the redirect plugin rewrites Wikipedia/IMDb to, so the boost still lands)
+    - '(.*\.)?wikipedia\.org$'
+    - '(.*\.)?wikiless\.org$'
+    - '(.*\.)?imdb\.com$'
+    - '(.*\.)?iket\.me$'
+    - '(.*\.)?rottentomatoes\.com$'
+    - '(.*\.)?metacritic\.com$'
+
+# (Reference) Full schema of the "Hostnames plugin":
 #
 # hostnames:
 #   replace:

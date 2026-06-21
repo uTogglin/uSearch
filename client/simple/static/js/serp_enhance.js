@@ -130,6 +130,42 @@
     .serp-src-statline { display:inline-flex; gap:9px; align-items:center; flex-shrink:0; }
     .serp-src-stat { display:inline-flex; align-items:center; gap:3px; font-weight:600; color:var(--color-base-font,#555); }
     .serp-src-stat svg { width:11px; height:11px; opacity:.8; }
+
+    /* "Where to watch" box — JustWatch offers, cheapest first */
+    .serp-src-watch .serp-src-head { color:#1f6feb; }
+    .serp-watch-head-title { color:inherit; text-decoration:none; }
+    .serp-watch-head-title:hover { text-decoration:underline; }
+    .serp-watch-yr { font-weight:400; color:#8a8a8a; }
+    .serp-watch-row {
+      display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px;
+      text-decoration:none; color:inherit; border-top:1px solid rgba(127,127,127,0.12);
+    }
+    .serp-src-watch .serp-watch-row:first-of-type { border-top:none; }
+    .serp-watch-row:hover { background:rgba(66,133,244,0.08); }
+    .serp-watch-provider {
+      font-size:0.84rem; font-weight:600; color:var(--color-base-font,#333);
+      flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .serp-watch-right { display:inline-flex; align-items:center; gap:7px; flex-shrink:0; }
+    .serp-watch-kind {
+      font-size:0.66rem; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+      padding:2px 6px; border-radius:5px; line-height:1;
+    }
+    .serp-watch-free   { color:#1a7f37; background:rgba(26,127,55,0.12); }
+    .serp-watch-stream { color:#1f6feb; background:rgba(31,111,235,0.12); }
+    .serp-watch-rent   { color:#9a6700; background:rgba(154,103,0,0.13); }
+    .serp-watch-buy    { color:#8250df; background:rgba(130,80,223,0.13); }
+    .serp-watch-quality { font-size:0.68rem; font-weight:600; color:#8a8a8a; min-width:1.4em; text-align:right; }
+    .serp-watch-price {
+      font-size:0.82rem; font-weight:700; color:var(--color-base-font,#333);
+      min-width:3.6em; text-align:right;
+    }
+    .serp-watch-price.muted { font-weight:500; color:#8a8a8a; }
+    .serp-watch-msg { padding:4px 6px; color:#8a8a8a; font-size:0.78rem; }
+    @media (prefers-color-scheme: dark) {
+      .serp-watch-provider, .serp-watch-price { color:#dcdcdc; }
+    }
+    .theme-dark .serp-watch-provider, .theme-dark .serp-watch-price { color:#dcdcdc; }
   `;
 
   function injectStyles() {
@@ -153,6 +189,7 @@
     reddit: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.93 12.6c.02.16.03.33.03.5 0 2.55-2.97 4.62-6.63 4.62s-6.63-2.07-6.63-4.62c0-.17.01-.34.03-.5a1.49 1.49 0 0 1-.5-2.66 1.49 1.49 0 0 1 1.84.18c.9-.62 2.12-1.02 3.47-1.07l.66-3.1a.32.32 0 0 1 .38-.25l2.2.47a1.04 1.04 0 1 1-.14.64l-1.97-.42-.59 2.78c1.33.06 2.53.46 3.42 1.07a1.49 1.49 0 0 1 2.06.12 1.49 1.49 0 0 1-.13 2.04 1.5 1.5 0 0 1-.7.4zM9.07 11.6a1.04 1.04 0 1 0 2.08 0 1.04 1.04 0 0 0-2.08 0zm5.86 2.95a.34.34 0 0 0-.48 0c-.43.43-1.32.58-2.04.58-.72 0-1.61-.15-2.04-.58a.34.34 0 1 0-.48.48c.68.68 1.98.73 2.52.73.54 0 1.84-.05 2.52-.73a.34.34 0 0 0-.01-.48zm-.99-1.9a1.04 1.04 0 1 0 0-2.08 1.04 1.04 0 0 0 0 2.08z"/></svg>',
     upvote: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l8 9h-5v9H9v-9H4z"/></svg>',
     comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
+    watch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/><rect x="2" y="4" width="20" height="15" rx="2.5"/><line x1="8" y1="22" x2="16" y2="22"/></svg>',
   };
 
   function fmtNum(n) {
@@ -447,32 +484,153 @@
     return g;
   }
 
+  // ── "Where to watch" box (film/TV queries) ─────────────────────────────────
+
+  // Hosts that mark a result set as a film/TV query (mirrors the server-side
+  // intent_boost.ENTERTAINMENT_REF list). iket.me is libremdb (IMDb frontend).
+  const ENT_HOSTS = ["imdb.com", "iket.me", "themoviedb.org", "rottentomatoes.com",
+    "metacritic.com", "justwatch.com", "thetvdb.com", "letterboxd.com"];
+
+  function isEntertainmentPage() {
+    let found = false;
+    document.querySelectorAll(".result").forEach((r) => {
+      if (found) return;
+      const h = hostnameOf(resultUrl(r));
+      if (h && ENT_HOSTS.some((e) => h === e || h.endsWith("." + e))) found = true;
+    });
+    return found;
+  }
+
+  function currentQuery() {
+    try {
+      const q = new URLSearchParams(location.search).get("q");
+      if (q && q.trim()) return q.trim();
+    } catch (_) { /* ignore */ }
+    const inp = document.getElementById("q");
+    return inp && inp.value ? inp.value.trim() : "";
+  }
+
+  const KIND_LABEL = { free: "Free", stream: "Stream", rent: "Rent", buy: "Buy" };
+
+  function renderWatchOffers(box, d, newTab) {
+    const head = box.querySelector(".serp-src-head");
+    const yr = d.year ? ' <span class="serp-watch-yr">(' + esc(d.year) + ")</span>" : "";
+    const titleHtml = ICON.watch + "<span>" + _("Where to watch") + " · </span>";
+    if (d.url) {
+      const a = document.createElement("a");
+      a.className = "serp-watch-head-title";
+      a.href = d.url;
+      if (newTab) { a.target = "_blank"; a.rel = "noopener noreferrer"; } else a.rel = "noopener";
+      a.innerHTML = esc(d.title) + yr;
+      head.innerHTML = titleHtml;
+      head.appendChild(a);
+    } else {
+      head.innerHTML = titleHtml + "<span>" + esc(d.title) + yr + "</span>";
+    }
+
+    const list = box.querySelector(".serp-watch-list");
+    list.innerHTML = "";
+    (d.offers || []).forEach((o) => {
+      const a = document.createElement("a");
+      a.className = "serp-watch-row";
+      a.href = o.url || d.url || "#";
+      if (newTab) { a.target = "_blank"; a.rel = "noopener noreferrer"; } else a.rel = "noopener";
+      // Price column: bold cost for rent/buy, muted label for free/subscription
+      // (the kind badge already says "Free"/"Stream", so don't repeat it).
+      let priceHtml = "";
+      if (o.kind === "rent" || o.kind === "buy") {
+        priceHtml = '<span class="serp-watch-price">' + esc(o.priceText || "") + "</span>";
+      } else if (o.kind === "stream") {
+        priceHtml = '<span class="serp-watch-price muted">' + esc(o.priceText || "") + "</span>";
+      }
+      a.innerHTML =
+        '<span class="serp-watch-provider"></span>' +
+        '<span class="serp-watch-right">' +
+          '<span class="serp-watch-kind serp-watch-' + o.kind + '">' +
+            esc(KIND_LABEL[o.kind] || o.kind) + "</span>" +
+          '<span class="serp-watch-quality">' + esc(o.quality || "") + "</span>" +
+          priceHtml +
+        "</span>";
+      a.querySelector(".serp-watch-provider").textContent = o.provider;
+      list.appendChild(a);
+    });
+    box.style.display = list.children.length ? "" : "none";
+  }
+
+  // Insert (once) a "Where to watch" box at the top of the sources wrap and
+  // fetch its offers. One-shot: the fetch is attempted at most once per page,
+  // so a "no offers" drop isn't retried on every mutation-observer tick.
+  let _watchAttempted = false;
+  function ensureWatchBox(wrap, newTab) {
+    if (_watchAttempted || document.getElementById("serp-watch")) return;
+    const query = currentQuery();
+    if (!query) return;
+    _watchAttempted = true;
+
+    const box = document.createElement("div");
+    box.id = "serp-watch";
+    box.className = "serp-src-group serp-src-watch";
+    box.style.display = "none";
+    box.innerHTML =
+      '<div class="serp-src-head">' + ICON.watch + "<span>" + _("Where to watch") + "</span></div>" +
+      '<div class="serp-watch-list"><div class="serp-watch-msg">' + _("Loading…") + "</div></div>";
+    wrap.insertBefore(box, wrap.firstChild);  // above Reddit/GitHub
+
+    function drop() {
+      box.remove();
+      // If the wrap existed only for this box, don't leave an empty container.
+      if (wrap && !wrap.querySelector(".serp-src-group")) wrap.remove();
+    }
+
+    fetch("/watch_offers?q=" + encodeURIComponent(query),
+          { headers: { Accept: "application/json" } })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d || d.type !== "watch" || !(d.offers && d.offers.length)) {
+          drop();  // nothing to show — don't leave an empty card
+          return;
+        }
+        renderWatchOffers(box, d, newTab);
+      })
+      .catch(drop);
+  }
+
+  // Minimal gettext shim — the SERP is rendered server-side already, so these
+  // strings stay English unless a translation hook is added later.
+  function _(s) { return s; }
+
   const TOP_MAX = 6;
   function buildTopSection() {
-    if (document.getElementById("serp-sources")) return;
     const results = document.getElementById("results");
     if (!results) return;
-    const items = collectMatches();
-    if (!items.length) return;
 
     const newTab = !!document.querySelector(
       '.result h3 a[target="_blank"], .result a.url_header[target="_blank"]');
+    const wantWatch = isEntertainmentPage();
 
-    const wrap = document.createElement("div");
-    wrap.id = "serp-sources";
-    // Reddit first (the headline "discussion" card), then GitHub.
-    const reddit = items.filter((it) => it.kind === "reddit");
-    const github = items.filter((it) => it.kind === "github");
-    if (reddit.length)
-      wrap.appendChild(buildGroup("Reddit", ICON.reddit, "reddit", reddit.slice(0, TOP_MAX), newTab));
-    if (github.length)
-      wrap.appendChild(buildGroup("GitHub", ICON.github, "github", github.slice(0, TOP_MAX), newTab));
-    if (!wrap.children.length) return;
+    let wrap = document.getElementById("serp-sources");
+    if (!wrap) {
+      const items = collectMatches();
+      const reddit = items.filter((it) => it.kind === "reddit");
+      const github = items.filter((it) => it.kind === "github");
+      if (!reddit.length && !github.length && !wantWatch) return;
 
-    // Sits at the very top of the results column, just under the AI summary.
-    const ai = document.getElementById("ai-summary-wrapper");
-    if (ai && ai.parentNode === results) ai.after(wrap);
-    else results.insertBefore(wrap, results.firstChild);
+      wrap = document.createElement("div");
+      wrap.id = "serp-sources";
+      // Reddit first (the headline "discussion" card), then GitHub.
+      if (reddit.length)
+        wrap.appendChild(buildGroup("Reddit", ICON.reddit, "reddit", reddit.slice(0, TOP_MAX), newTab));
+      if (github.length)
+        wrap.appendChild(buildGroup("GitHub", ICON.github, "github", github.slice(0, TOP_MAX), newTab));
+
+      // Sits at the very top of the results column, just under the AI summary.
+      const ai = document.getElementById("ai-summary-wrapper");
+      if (ai && ai.parentNode === results) ai.after(wrap);
+      else results.insertBefore(wrap, results.firstChild);
+    }
+
+    // The watch box goes above the Reddit/GitHub groups (cheapest-first offers).
+    if (wantWatch) ensureWatchBox(wrap, newTab);
   }
 
   // ── 3. Copy-summary button on the AI summary block ─────────────────────────
