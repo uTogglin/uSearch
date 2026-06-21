@@ -58,10 +58,12 @@ engines:
     disabled: false
 
 search:
-  # Show a favicon next to every result. "duckduckgo" is fetched + cached
-  # server-side (no extra browser requests), keeping the no-external-calls
-  # property of the degoog fork. Also feeds the icons in the AI summary box.
-  favicon_resolver: "duckduckgo"
+  # Show a favicon next to every result. "multi" is a fallback chain that tries
+  # google → duckduckgo → yandex → allesedv and uses the first real icon, so far
+  # fewer results fall back to the blank placeholder than with a single provider.
+  # Fetched + cached server-side (no extra browser requests), keeping the
+  # no-external-calls property of the degoog fork. Also feeds the AI summary box.
+  favicon_resolver: "multi"
 
 server:
   secret_key: "ultrasecretkey" # overwritten by $SEARXNG_SECRET / entrypoint

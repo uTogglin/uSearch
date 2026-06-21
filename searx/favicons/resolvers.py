@@ -7,7 +7,7 @@ timeout``) and returns a tuple ``(data, mime)``.
 """
 
 
-__all__ = ["DEFAULT_RESOLVER_MAP", "allesedv", "duckduckgo", "google", "yandex"]
+__all__ = ["DEFAULT_RESOLVER_MAP", "allesedv", "duckduckgo", "google", "yandex", "multi"]
 
 from typing import Callable
 from searx import network
@@ -91,9 +91,45 @@ def yandex(domain: str, timeout: int) -> tuple[None | bytes, None | str]:
     return data, mime
 
 
+# Order of the providers tried by :py:func:`multi`. Highest coverage / best
+# quality first, near-guaranteed last-resort last, so most domains resolve on the
+# first hop and only genuinely obscure ones walk the whole chain.
+#   * google     — faviconV2, the broadest coverage and cleanest 32x32 output
+#   * duckduckgo — solid second source, different crawl so it fills google's gaps
+#   * yandex     — only 16x16, but covers domains the western crawlers miss
+#   * allesedv   — answers for almost anything, kept last as a backstop
+_MULTI_CHAIN = (google, duckduckgo, yandex, allesedv)
+
+
+def multi(domain: str, timeout: int) -> tuple[None | bytes, None | str]:
+    """Fallback-chain resolver: try each provider in :py:data:`_MULTI_CHAIN` in
+    order and return the first one that yields a real favicon.
+
+    A single provider has no icon for a large share of domains, so relying on
+    just one leaves many results showing the blank placeholder. Walking several
+    providers raises the hit rate dramatically: a domain only falls back to the
+    placeholder when *none* of them has an icon.
+
+    Each provider already validates its own "no icon" sentinel (404, 1x1 pixel,
+    gif placeholder, …) and returns ``(None, None)`` on a miss, so here we simply
+    take the first non-empty result. A provider that errors out (network/HTTP) is
+    skipped rather than aborting the chain.
+    """
+    for func in _MULTI_CHAIN:
+        try:
+            data, mime = func(domain, timeout)
+        except Exception:  # pylint: disable=broad-except
+            logger.exception("favicon resolver %s failed for %s", func.__name__, domain)
+            continue
+        if data is not None and mime is not None:
+            return data, mime
+    return None, None
+
+
 DEFAULT_RESOLVER_MAP = {
     "allesedv": allesedv,
     "duckduckgo": duckduckgo,
     "google": google,
     "yandex": yandex,
+    "multi": multi,
 }
