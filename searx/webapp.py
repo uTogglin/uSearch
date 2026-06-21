@@ -611,6 +611,25 @@ def add_default_headers(response: flask.Response):
 
 
 @app.after_request
+def no_edge_cache_html(response: flask.Response):
+    # Dynamic HTML pages (search, index, preferences) are per-user — they depend
+    # on the preferences cookie and embed freshly-resolved favicons straight into
+    # the markup. They must NEVER be held by a shared cache. A broad Cloudflare
+    # "cache everything" rule otherwise treats /search as a static asset and pins
+    # one user's snapshot — including a cold box's placeholder favicons — at the
+    # edge for hours, which is the favicon flakiness this guards against.
+    #
+    # Static assets (JS/CSS/images) carry their own long-lived Cache-Control set
+    # in static_headers() and are never text/html, so they are untouched here.
+    # CDN-Cache-Control targets the edge specifically (Cloudflare honours it over
+    # Cache-Control), same pattern as the favicon batch routes.
+    if response.headers.get('Content-Type', '').startswith('text/html') and 'Cache-Control' not in response.headers:
+        response.headers['Cache-Control'] = 'private, no-cache'
+        response.headers['CDN-Cache-Control'] = 'no-store'
+    return response
+
+
+@app.after_request
 def post_request(response: flask.Response):
     total_time = default_timer() - sxng_request.start_time
     timings_all = [
@@ -907,7 +926,7 @@ def esearch():
         except Exception:  # pylint: disable=broad-except
             logger.exception('esearch: process_response failed; serving raw body')
         payload = json.dumps({'html': resp.get_data(as_text=True)})
-    return jsonify(session.encrypt(payload))
+    return _no_store(jsonify(session.encrypt(payload)))
 
 
 @app.route('/about', methods=['GET'])
@@ -1014,7 +1033,7 @@ def eautocompleter():
         flask.abort(400)
 
     suggestions, _ = _run_autocompleter(query, xhr=False)
-    return jsonify(session.encrypt(suggestions))
+    return _no_store(jsonify(session.encrypt(suggestions)))
 
 
 # Resolving favicons one HTTP request per result floods the edge Worker (and, on
@@ -1035,6 +1054,22 @@ def _resolve_favicons(authorities) -> "dict[str, str]":
     return favicons.favicon_data_url_batch(authorities, FAVICON_BATCH_MAX)
 
 
+def _no_store(resp):
+    """Mark a response as never-cacheable — by the browser *and* the CDN.
+
+    The favicon batch replies MUST NOT be cached at the Cloudflare edge. They are
+    POSTs (uncacheable by default), but a "Cache Everything" rule or any shared
+    edge cache can cache them anyway, and a replayed reply is actively wrong: every
+    request carries a *fresh* ephemeral key, so a cached ``/efavicon_batch`` body
+    is encrypted to a different key than the next client holds and fails to
+    decrypt (placeholder favicons); a cached ``/favicon_batch`` replays the first
+    caller's icons to everyone. ``CDN-Cache-Control`` targets the edge
+    specifically (Cloudflare honours it over ``Cache-Control``)."""
+    resp.headers['Cache-Control'] = 'no-store, private'
+    resp.headers['CDN-Cache-Control'] = 'no-store'
+    return resp
+
+
 @app.route('/favicon_batch', methods=['POST'])
 def favicon_batch():
     """Resolve many result favicons in one request.
@@ -1045,7 +1080,7 @@ def favicon_batch():
     Collapses what used to be one ``/favicon_proxy`` GET per result into a single
     round-trip — far fewer edge Worker invocations per search."""
     body = sxng_request.get_json(silent=True) or {}
-    return jsonify({'icons': _resolve_favicons(body.get('authorities', []))})
+    return _no_store(jsonify({'icons': _resolve_favicons(body.get('authorities', []))}))
 
 
 @app.route('/efavicon_batch', methods=['POST'])
@@ -1068,7 +1103,7 @@ def efavicon_batch():
     except (ValueError, AttributeError):
         flask.abort(400)
     icons = _resolve_favicons(authorities)
-    return jsonify(session.encrypt(json.dumps({'icons': icons})))
+    return _no_store(jsonify(session.encrypt(json.dumps({'icons': icons}))))
 
 
 @app.route('/preferences', methods=['GET', 'POST'])

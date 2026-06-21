@@ -150,7 +150,13 @@ def favicon_proxy():
 
     if data is not None and mime is not None:
         resp = flask.Response(data, mimetype=mime)  # type: ignore
+        # Keep the browser cache (client only refetches when it drops the icon),
+        # but tell the Cloudflare edge not to hold it — otherwise a domain whose
+        # icon later resolves to a better one keeps serving the stale cached copy
+        # for up to max_age. CDN-Cache-Control targets the edge specifically
+        # (Cloudflare honours it over Cache-Control), same as the batch routes.
         resp.headers['Cache-Control'] = f"max-age={CFG.max_age}"
+        resp.headers['CDN-Cache-Control'] = 'no-store'
         return resp
 
     # return default favicon from static path
