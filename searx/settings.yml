@@ -263,6 +263,26 @@ plugins:
   searx.plugins.ai_summary.SXNGPlugin:
     active: true
 
+  searx.plugins.card_meta.SXNGPlugin:
+    active: true
+
+
+# Configuration of the "Card Meta plugin" (GitHub / Reddit result cards):
+#
+# Server-side proxy that fetches public GitHub repo / Reddit thread metadata so
+# the browser never talks to those services directly. Both upstream endpoints
+# are free and unauthenticated; aggressive caching keeps us under their limits,
+# so this costs nothing extra to run.
+card_meta:
+  timeout: 6                # upstream request timeout (seconds)
+  cache_ttl: 3600           # cache fetched metadata for 1 hour
+  cache_max: 1000           # max cached entries
+  rate_limit_capacity: 20   # per-IP burst size
+  rate_limit_rate: 2.0      # per-IP tokens refilled per second
+  # Optional: a GitHub token (or the GITHUB_TOKEN env var) raises the anonymous
+  # 60/hr limit to 5000/hr. Leave empty to stay fully anonymous and free.
+  github_token: ""
+
 
 # Configuration of the "AI Summary plugin" (OpenRouter):
 #
