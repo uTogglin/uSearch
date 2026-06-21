@@ -257,6 +257,9 @@ plugins:
   searx.plugins.tracker_url_remover.SXNGPlugin:
     active: true
 
+  searx.plugins.link_unwrap.SXNGPlugin:
+    active: true
+
   searx.plugins.ai_summary.SXNGPlugin:
     active: true
 
