@@ -48,12 +48,16 @@ class TrackerPatternsDB:
         if self.cache.properties("tracker_patterns loaded") != "OK":
             # To avoid parallel initializations, the property is set first
             self.cache.properties.set("tracker_patterns loaded", "OK")
-            self.load()
+            if not self.load():
+                # the remote fetch produced no rules (e.g. ClearURLs timed out on
+                # a cold boot): clear the flag so the next request retries instead
+                # of silently leaving tracker removal disabled for this instance
+                self.cache.properties.set("tracker_patterns loaded", "")
         # F I X M E:
         #     do we need a maintenance .. remember: database is stored
         #     in /tmp and will be rebuild during the reboot anyway
 
-    def load(self):
+    def load(self) -> int:
         log.debug("init searx.data.TRACKER_PATTERNS")
         rows: "list[CacheRowType]" = []
 
@@ -66,6 +70,7 @@ class TrackerPatternsDB:
             rows.append((key, value, None))
 
         self.cache.setmany(rows, ctx=self.ctx_name)
+        return len(rows)
 
     def add(self, rule: RuleType):
         key = rule[self.Fields.url_regexp]
