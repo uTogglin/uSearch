@@ -16,6 +16,14 @@ swap_size_mb = 512
 [build]
   dockerfile = "container/fly.dockerfile"
 
+# Persistent volume for the favicon cache (SQLite). Mounted at the SearXNG data
+# path so resolved favicons survive deploys and scale-to-zero cold boots instead
+# of starting from an empty /tmp every time. The entrypoint chowns it to the
+# searxng user on boot. Create once: `fly volumes create faviconcache --size 1`.
+[mounts]
+  source = "faviconcache"
+  destination = "/var/cache/searxng"
+
 [http_service]
   internal_port = 8080
   force_https = true

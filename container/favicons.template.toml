@@ -1,0 +1,18 @@
+# Favicon cache configuration for the container deployment.
+#
+# The cache DB lives on the persistent volume mounted at the SearXNG data path
+# (/var/cache/searxng) instead of the default ephemeral /tmp. That way resolved
+# favicons survive deploys and scale-to-zero cold boots, so a freshly woken box
+# serves most icons straight from the warm cache (inlined into the HTML) rather
+# than leaning on a cold /favicon_batch round-trip for every result.
+#
+# The entrypoint copies this file to $__SEARXNG_CONFIG_PATH/favicons.toml on
+# boot (build-time writes to that path are discarded because it is a VOLUME).
+
+[favicons]
+
+cfg_schema = 1
+
+[favicons.cache]
+
+db_url = "/var/cache/searxng/faviconcache.db"

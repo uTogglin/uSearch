@@ -94,6 +94,16 @@ EOF
     fi
 
     check_file "$target_settings"
+
+    # Favicon cache config: points the cache DB at the persistent data-path
+    # volume (see container/favicons.toml). Copied every boot (overwrite) so an
+    # image update to the config takes effect — the config path is ephemeral, so
+    # this can't be baked in at build time. Harmless if the template is absent.
+    local template_favicons="/usr/local/searxng/favicons.template.toml"
+    local target_favicons="$__SEARXNG_CONFIG_PATH/favicons.toml"
+    if [ -f "$template_favicons" ]; then
+        cp -pfT "$template_favicons" "$target_favicons"
+    fi
 }
 
 cat <<EOF
