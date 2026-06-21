@@ -35,13 +35,14 @@ def init(cfg: "FaviconProxyConfig"):
 
 
 def _initial_resolver_map():
-    d = {}
-    name: str = get_setting("search.favicon_resolver", None)  # type: ignore
-    if name:
-        func = DEFAULT_RESOLVER_MAP.get(name)
-        if func:
-            d = {name: f"searx.favicons.resolvers.{func.__name__}"}
-    return d
+    # Register every built-in resolver, not just the configured default. This
+    # keeps the favicon-resolver preference a valid choice when the instance
+    # default changes (e.g. an older "duckduckgo" cookie stays valid after the
+    # default became "multi") — otherwise the stale value fails EnumStringSetting
+    # validation and aborts parsing of the whole preferences cookie. It also lets
+    # users pick a resolver from the dropdown. A favicons.toml resolver_map still
+    # overrides this (msgspec only calls the default factory when unset).
+    return {name: f"searx.favicons.resolvers.{func.__name__}" for name, func in DEFAULT_RESOLVER_MAP.items()}
 
 
 class FaviconProxyConfig(msgspec.Struct):
@@ -191,11 +192,17 @@ def search_favicon(resolver: str, authority: str) -> tuple[None | bytes, None | 
 
     try:
         data, mime = func(authority, timeout=CFG.resolver_timeout)
-        if data is None or mime is None:
-            data, mime = (None, None)
-
     except (HTTPError, SearxEngineResponseException):
-        pass
+        # Transient failure (timeout, rate-limit, gateway/server error). Do NOT
+        # cache this: a cached miss sticks for the whole hold time (30 days), so a
+        # single blip from the favicon provider would blank the icon for big
+        # domains (linkedin.com, play.google.com, …) for a month. Leave the cache
+        # untouched and return blank for now; the next request retries.
+        return None, None
+
+    if data is None or mime is None:
+        # Definitive miss (provider is sure there is no favicon) — safe to cache.
+        data, mime = (None, None)
 
     cache.CACHE.set(resolver, authority, mime, data)
     return data, mime
