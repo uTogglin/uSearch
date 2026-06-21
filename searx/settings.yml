@@ -260,11 +260,37 @@ plugins:
   searx.plugins.link_unwrap.SXNGPlugin:
     active: true
 
+  searx.plugins.privacy_redirect.SXNGPlugin:
+    active: true
+
   searx.plugins.ai_summary.SXNGPlugin:
     active: true
 
   searx.plugins.card_meta.SXNGPlugin:
     active: true
+
+
+# Configuration of the "Privacy redirect plugin":
+#
+# Rewrites result links that point at tracking sites (Twitter/X, Reddit, Quora,
+# Imgur, TikTok, Medium, IMDb, Genius, Odysee, Wikipedia, Fandom) so they open
+# through a privacy-respecting frontend instead. Toggle per-user in the Privacy
+# tab of the preferences. YouTube is intentionally never redirected.
+#
+# Point each service at an instance you trust (public instances come and go).
+# Leave a value empty ("") to disable the redirect for that single service.
+privacy_redirect:
+  nitter:     "https://nitter.net"               # Twitter / X
+  redlib:     "https://redlib.catsarch.com"       # Reddit
+  quetre:     "https://quetre.iket.me"            # Quora
+  rimgo:      "https://rimgo.totaldarkness.net"    # Imgur
+  proxitok:   "https://proxitok.lunar.icu"         # TikTok
+  scribe:     "https://scribe.rip"                 # Medium
+  libremdb:   "https://libremdb.iket.me"           # IMDb
+  dumb:       "https://dumb.lunar.icu"             # Genius
+  librarian:  "https://librarian.pussthecat.org"   # Odysee
+  wikiless:   "https://wikiless.org"               # Wikipedia
+  breezewiki: "https://breezewiki.com"             # Fandom / Wikia
 
 
 # Configuration of the "Card Meta plugin" (GitHub / Reddit result cards):
