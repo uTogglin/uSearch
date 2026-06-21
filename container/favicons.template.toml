@@ -16,3 +16,10 @@ cfg_schema = 1
 [favicons.cache]
 
 db_url = "/var/cache/searxng/faviconcache.db"
+
+# Cap the cache at 900 MB (default is 50 MB). The volume is 1 GB, so this leaves
+# ~100 MB of headroom — the limit is only enforced at each maintenance interval
+# (hourly) and can be exceeded between runs, so the buffer matters. At 20 KB max
+# per BLOB the per-interval overshoot is bounded well under that headroom.
+# 900 * 1024 * 1024 = 943718400
+LIMIT_TOTAL_BYTES = 943718400
