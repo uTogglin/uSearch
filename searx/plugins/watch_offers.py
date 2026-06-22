@@ -42,9 +42,12 @@ CONFIGURATION (settings.yml)
 
 import json
 import logging
+import math
+import re
 import threading
 import time
 import typing as t
+import unicodedata
 
 import httpx
 from flask_babel import gettext as _
@@ -62,6 +65,43 @@ _JW_GRAPHQL = "https://apis.justwatch.com/graphql"
 _JW_WEB = "https://www.justwatch.com"
 
 _MAX_QUERY_LEN = 200
+
+# For a TV series, users (and JustWatch's own URLs) tack a season/episode marker
+# onto the title — "Raising Dion season 2", "the bear s3 episode 1". JustWatch's
+# search matches the bare show title fine, but the *trailing* tokens after the
+# marker ("...release date netflix") poison its relevance ranking and surface the
+# wrong title entirely. So we cut the query at the first season/episode marker.
+# A digit is required after the word forms, so this only fires on real season
+# references and never mangles movie titles like "Season of the Witch" or
+# "Kill Bill: Vol. 1" without a number.
+_SEASON_MARKER = re.compile(
+    r"\s+(?:"
+    r"(?:season|series|chapter|part|vol(?:ume)?|episode|ep)\s*\.?\s*\d+"  # "season 2", "ep 3"
+    r"|s\d{1,2}(?:\s*e\d{1,3})?"                                          # "s3", "s02e05"
+    r").*$",
+    re.IGNORECASE,
+)
+
+# A trailing *generic* media qualifier ("...series", "...tv show", "...anime")
+# is how people disambiguate a title that shares its name with a game or product
+# ("pokemon black and white series" -> the anime, not the Nintendo game). It is
+# not part of the actual title, so strip it before searching JustWatch — it only
+# adds noise to the relevance match and bloats the cache key. Kept conservative:
+# we never strip bare "show"/"movie"/"film" (real titles end in those — "The
+# Truman Show", "The Lego Movie").
+_MEDIA_QUALIFIER = re.compile(
+    r"\s+(?:the\s+)?(?:tv\s+series|web\s+series|mini[-\s]?series|tv\s+show|series|anime)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _normalise_query(query: str) -> str:
+    """Strip a trailing season/episode reference (and anything after it), then a
+    trailing generic media qualifier, so a series resolves to its show page.
+    Falls back to the original query if the result would be empty."""
+    stripped = _SEASON_MARKER.sub("", query)
+    stripped = _MEDIA_QUALIFIER.sub("", stripped).strip(" -:|·")
+    return stripped or query
 
 # JustWatch GraphQL: search titles + their per-country streaming offers. Kept
 # lean — only the fields we render. `popularTitles` is already relevance-sorted.
@@ -258,17 +298,108 @@ def _cheaper_better(a: dict, b: dict) -> bool:
     return _QUALITY_RANK.get(a["quality"], 9) < _QUALITY_RANK.get(b["quality"], 9)
 
 
-def _pick_title(edges: list) -> "dict | None":
-    """Pick the most relevant title that actually has offers; fall back to the
-    top relevance match."""
-    first = None
+_TOKEN_RE = re.compile(r"[0-9a-z]+")
+
+# Tokens that carry no title identity — articles/conjunctions and the
+# platform/format words people append ("...on netflix", "...full movie hd").
+# Excluded when measuring how well the chosen title accounts for the query, so
+# they neither prop up nor sink a confidence score.
+_GATE_STOPWORDS = {
+    "the", "a", "an", "of", "and", "or", "to", "in", "on", "at", "for", "with",
+    "tv", "series", "season", "episode", "show", "movie", "film", "watch",
+    "stream", "streaming", "online", "free", "full", "hd", "uhd", "4k",
+    "netflix", "hulu", "disney", "plus", "prime", "video", "amazon", "hbo",
+    "max", "peacock", "paramount", "apple", "iplayer", "bbc", "itv", "channel",
+}
+
+# Minimum share of the query's *content* tokens the chosen title must cover for
+# the box to be shown. Below this, JustWatch only had a looser/parent title than
+# what was searched (it carries "Pokémon" but not the "...Black & White" series),
+# so a box would mislead — better to show nothing.
+_MIN_CONFIDENCE = 0.5
+
+
+def _match_confidence(title: str, query: str) -> float:
+    """Fraction of the query's content tokens (stopwords/platform words removed)
+    that ``title`` accounts for. 1.0 when the query is all qualifiers so an
+    all-noise query (e.g. "the show") is never gated out."""
+    q = _tokens(query) - _GATE_STOPWORDS
+    if not q:
+        return 1.0
+    return len(q & _tokens(title)) / len(q)
+
+
+def _tokens(text: str) -> set:
+    # Fold accents (NFKD + drop combining marks) so "Pokémon" tokenises to
+    # {pokemon} and matches an un-accented query "pokemon" — otherwise the
+    # `[0-9a-z]+` regex splits it into {pok, mon} and never matches.
+    folded = unicodedata.normalize("NFKD", (text or "").lower())
+    folded = "".join(c for c in folded if not unicodedata.combining(c))
+    return set(_TOKEN_RE.findall(folded))
+
+
+def _pick_title(edges: list, query: str) -> "dict | None":
+    """Pick the node whose title best matches the query, breaking ties toward
+    nodes that actually have offers, then JustWatch's own relevance order.
+
+    JustWatch's popularTitles is relevance-sorted, but for a long/specific title
+    ("Thunderbirds Are Go") a shorter sibling ("Thunderbirds") can be the first
+    edge that happens to carry offers — so the old "first with offers" rule
+    silently showed the wrong title. Scoring the candidate titles against the
+    query keeps the box honest in both directions: "thunderbirds are go" prefers
+    the exact match, while a bare "thunderbirds" prefers the shorter title (the
+    longer one carries extra, unmatched tokens).
+
+    Coverage is IDF-weighted over the candidate set so a *distinctive* query
+    token outweighs generic ones. For "pokemon black and white" JustWatch
+    returns both the "Pokémon" show and a 2002 film literally titled "Black and
+    White"; plain token-count coverage picked the film (it matches three common
+    words), but "pokemon" is rare across the candidates and "black"/"and"/"white"
+    are not, so weighting by rarity correctly surfaces the show."""
+    q_tokens = _tokens(query)
+
+    nodes: list = []
+    cand_tokens: list = []
     for edge in edges or []:
         node = (edge or {}).get("node") or {}
-        if first is None:
-            first = node
-        if node.get("offers"):
-            return node
-    return first
+        nodes.append(node)
+        cand_tokens.append(_tokens((node.get("content") or {}).get("title")))
+
+    n = len(cand_tokens)
+    df: dict = {}
+    for ct in cand_tokens:
+        for tok in ct:
+            df[tok] = df.get(tok, 0) + 1
+
+    def _idf(tok: str) -> float:
+        # Classic log(N/df): a token in every candidate scores 0 (fully generic),
+        # a token in one candidate scores high. Single-candidate sets have no
+        # signal, so weight all tokens equally.
+        return math.log(n / max(df.get(tok, 0), 1)) if n > 1 else 1.0
+
+    q_weight = sum(_idf(tok) for tok in q_tokens)
+
+    best = None
+    best_key = None
+    for node, t_tokens in zip(nodes, cand_tokens):
+        if q_tokens:
+            exact = 1 if q_tokens == t_tokens else 0
+            matched = q_tokens & t_tokens
+            if q_weight > 0:
+                covered = sum(_idf(tok) for tok in matched) / q_weight
+            else:
+                # Every query token is generic across candidates — fall back to
+                # plain coverage so we still prefer the fuller match.
+                covered = len(matched) / len(q_tokens)
+            extra = len(t_tokens - q_tokens)
+        else:
+            exact = covered = extra = 0
+        has_offers = 1 if node.get("offers") else 0
+        # exact > weighted coverage > fewer spurious tokens > has offers > JW order
+        key = (exact, covered, -extra, has_offers)
+        if best is None or key > best_key:
+            best, best_key = node, key
+    return best
 
 
 def _fetch_offers(query: str, country: str, language: str, max_offers: int) -> dict:
@@ -294,7 +425,7 @@ def _fetch_offers(query: str, country: str, language: str, max_offers: int) -> d
     body = resp.json()
 
     edges = (((body.get("data") or {}).get("popularTitles") or {}).get("edges")) or []
-    node = _pick_title(edges)
+    node = _pick_title(edges, query)
     if not node:
         return {"type": None, "missing": True}
 
@@ -303,6 +434,12 @@ def _fetch_offers(query: str, country: str, language: str, max_offers: int) -> d
     offers = _normalise_offers(node.get("offers"), max_offers)
     if not title or not offers:
         # A title with zero streaming offers isn't worth a box.
+        return {"type": None, "missing": True}
+
+    if _match_confidence(title, query) < _MIN_CONFIDENCE:
+        # The best JustWatch match doesn't cover the query's content words —
+        # e.g. "pokemon black and white" resolves only to the parent "Pokémon"
+        # show. Showing it would mislead, so report nothing rather than guess.
         return {"type": None, "missing": True}
 
     full_path = content.get("fullPath") or ""
@@ -362,6 +499,11 @@ class SXNGPlugin(Plugin):
             query = (freq.args.get("q", "") or "").strip()[:_MAX_QUERY_LEN]
             if not query:
                 return Response('{"type":null}', mimetype="application/json", status=400)
+
+            # Series queries carry a "season N"/"sNNeMM" tail that derails
+            # JustWatch search — resolve to the bare show title (also tightens
+            # the cache key, so "raising dion season 2" shares "raising dion").
+            query = _normalise_query(query)
 
             region = _region()
             language = region.lower()  # JustWatch accepts the country code as language
