@@ -952,6 +952,38 @@
     return true;
   }
 
+  // ── Currency-query gate ─────────────────────────────────────────────────────
+  // Currency conversions ("25 gbp to usd") get a dedicated converter card from
+  // serp_enhance.js, which also removes this box. We additionally suppress the
+  // box up-front here so it never flashes for an obvious currency query. The
+  // vocabulary is kept in sync with serp_enhance.js and currency_box.py.
+  const FX_SYMBOLS = "$£€¥₹₩₽₺₪₫฿₴₦";
+  const FX_WORDS = new Set([
+    "usd","eur","gbp","jpy","aud","cad","chf","cny","hkd","nzd","sgd","inr",
+    "krw","mxn","brl","zar","rub","try","sek","nok","dkk","pln","thb","idr",
+    "huf","czk","ils","aed","sar","php","myr","ron","rmb",
+    "dollar","dollars","buck","bucks","pound","pounds","quid","sterling",
+    "euro","euros","yen","rupee","rupees","won","yuan","renminbi","franc",
+    "francs","peso","pesos","real","reais","rand","ruble","rubles","rouble",
+    "lira","ringgit","baht","shekel","dirham","riyal","zloty","krona","krone",
+  ]);
+
+  function fxSide(side) {
+    side = (side || "").toLowerCase().replace(/[0-9.,]+/g, "").trim();
+    for (const s of FX_SYMBOLS) if (side.indexOf(s) !== -1) return true;
+    side = side.replace(new RegExp("[" + FX_SYMBOLS.replace(/[$]/g, "\\$") + "]", "g"), "").trim();
+    if (!side) return false;
+    if (FX_WORDS.has(side)) return true;
+    return side.split(/\s+/).some((w) => FX_WORDS.has(w));
+  }
+
+  function isCurrencyQuery(q) {
+    if (!q) return false;
+    const m = q.match(/^\s*(?:convert\s+)?(.+?)\s+(?:into|in|to|=|->|→)\s+(.+?)\s*$/i);
+    if (!m) return false;
+    return fxSide(m[1]) && fxSide(m[2]);
+  }
+
   // ── Main ──────────────────────────────────────────────────────────────────
 
   function run() {
@@ -960,6 +992,9 @@
 
     // Only run on the General search tab
     if (!isGeneralTab()) return;
+
+    // Currency conversions get a converter card instead of an AI summary.
+    if (isCurrencyQuery(getQuery())) return;
 
     const query = getQuery();
     if (!query) return;
