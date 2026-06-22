@@ -166,6 +166,100 @@
       .serp-watch-provider, .serp-watch-price { color:#dcdcdc; }
     }
     .theme-dark .serp-watch-provider, .theme-dark .serp-watch-price { color:#dcdcdc; }
+
+    /* "Best PC price" box — CheapShark + ITAD official stores, cheapest first */
+    .serp-src-game .serp-src-head { color:#1a7f37; }
+    .serp-game-head-title { color:inherit; text-decoration:none; }
+    .serp-game-head-title:hover { text-decoration:underline; }
+    .serp-game-sub { font-weight:400; font-size:0.72rem; color:#8a8a8a; margin-left:2px; }
+    .serp-game-section { margin-top:2px; }
+    .serp-game-label {
+      font-size:0.66rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+      color:#8a8a8a; margin:0 0 2px 2px;
+    }
+    .serp-game-row {
+      display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px;
+      text-decoration:none; color:inherit; border-top:1px solid rgba(127,127,127,0.12);
+    }
+    .serp-game-list .serp-game-row:first-of-type { border-top:none; }
+    .serp-game-row:hover { background:rgba(26,127,55,0.08); }
+    .serp-game-store {
+      font-size:0.84rem; font-weight:600; color:var(--color-base-font,#333);
+      flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .serp-game-right { display:inline-flex; align-items:center; gap:7px; flex-shrink:0; }
+    .serp-game-cut {
+      font-size:0.66rem; font-weight:700; color:#1a7f37; background:rgba(26,127,55,0.12);
+      padding:2px 5px; border-radius:5px; line-height:1;
+    }
+    .serp-game-price {
+      font-size:0.82rem; font-weight:700; color:var(--color-base-font,#333);
+      min-width:3.6em; text-align:right;
+    }
+    .serp-game-regular { font-size:0.7rem; color:#8a8a8a; text-decoration:line-through; }
+    .serp-game-msg { padding:4px 6px; color:#8a8a8a; font-size:0.78rem; }
+    @media (prefers-color-scheme: dark) {
+      .serp-game-store, .serp-game-price { color:#dcdcdc; }
+    }
+    .theme-dark .serp-game-store, .theme-dark .serp-game-price { color:#dcdcdc; }
+
+    /* Currency converter card (currency-conversion queries) */
+    #serp-currency {
+      border:1px solid rgba(127,127,127,0.22); border-radius:14px;
+      background:rgba(127,127,127,0.04); padding:16px 18px 14px;
+      margin:0 0 16px 0; box-sizing:border-box;
+    }
+    .serp-fx-grid {
+      display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);
+      gap:18px 24px; align-items:start;
+    }
+    @media (max-width:560px) { .serp-fx-grid { grid-template-columns:1fr; } }
+    .serp-fx-equals { font-size:0.92rem; color:#8a8a8a; margin:0 0 2px; }
+    .serp-fx-result {
+      font-size:2rem; font-weight:400; line-height:1.15; margin:0 0 14px;
+      color:var(--color-base-font,#202124); letter-spacing:-0.01em;
+    }
+    .serp-fx-result .serp-fx-amt { font-weight:600; }
+    .serp-fx-result .serp-fx-cur { color:#8a8a8a; }
+    .serp-fx-fields { display:flex; flex-direction:column; gap:9px; }
+    .serp-fx-row {
+      display:grid; grid-template-columns:1fr 9.5em; gap:8px; align-items:stretch;
+    }
+    .serp-fx-input, .serp-fx-select {
+      font:inherit; font-size:0.92rem; color:var(--color-base-font,#202124);
+      background:var(--color-base-background,#fff);
+      border:1px solid rgba(127,127,127,0.4); border-radius:8px;
+      padding:8px 10px; min-width:0; box-sizing:border-box; height:38px;
+    }
+    .serp-fx-input:focus, .serp-fx-select:focus {
+      outline:none; border-color:#4285f4; box-shadow:0 0 0 1px rgba(66,133,244,0.4);
+    }
+    .serp-fx-input { -moz-appearance:textfield; }
+    .serp-fx-input::-webkit-outer-spin-button,
+    .serp-fx-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+    .serp-fx-select { cursor:pointer; }
+
+    .serp-fx-chart { position:relative; min-width:0; }
+    .serp-fx-chart svg { display:block; width:100%; height:auto; overflow:visible; }
+    .serp-fx-chart .serp-fx-gridline { stroke:rgba(127,127,127,0.18); stroke-width:1; }
+    .serp-fx-chart .serp-fx-axis {
+      font-size:10px; fill:#8a8a8a; font-family:inherit;
+    }
+    .serp-fx-rateline { font-size:0.74rem; color:#8a8a8a; margin:6px 2px 0; }
+    .serp-fx-chart-empty {
+      display:flex; align-items:center; justify-content:center; min-height:120px;
+      color:#8a8a8a; font-size:0.8rem; text-align:center; padding:0 10px;
+    }
+    @media (prefers-color-scheme: dark) {
+      .serp-fx-result { color:#e8e8e8; }
+      .serp-fx-input, .serp-fx-select {
+        color:#e8e8e8; background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.18);
+      }
+    }
+    .theme-dark .serp-fx-result { color:#e8e8e8; }
+    .theme-dark .serp-fx-input, .theme-dark .serp-fx-select {
+      color:#e8e8e8; background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.18);
+    }
   `;
 
   function injectStyles() {
@@ -190,6 +284,7 @@
     upvote: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l8 9h-5v9H9v-9H4z"/></svg>',
     comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
     watch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/><rect x="2" y="4" width="20" height="15" rx="2.5"/><line x1="8" y1="22" x2="16" y2="22"/></svg>',
+    game: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><rect x="2" y="6" width="20" height="12" rx="4"/></svg>',
   };
 
   function fmtNum(n) {
@@ -491,7 +586,16 @@
   const ENT_HOSTS = ["imdb.com", "iket.me", "themoviedb.org", "rottentomatoes.com",
     "metacritic.com", "justwatch.com", "thetvdb.com", "letterboxd.com"];
 
+  // An explicit film/TV qualifier in the query is also entertainment intent,
+  // even when the result set is dominated by a same-named game or product
+  // ("pokemon black and white series" -> the anime, not the Nintendo game). The
+  // watch box self-cancels when JustWatch has no offers, so a stray match here
+  // costs at most one cancelled fetch. Bare "series" only counts at the end of
+  // the query (the disambiguation pattern), so "time series analysis" is skipped.
+  const ENT_QUERY_RE = /\b(?:tv|web)\s+series\b|\bmini[-\s]?series\b|\b(?:tv|web)\s+show\b|\banime\b|\bseason\s*\d+\b|\bepisode\s*\d+\b|\bs\d{1,2}e\d{1,3}\b|\bseries\s*$/i;
+
   function isEntertainmentPage() {
+    if (ENT_QUERY_RE.test(currentQuery())) return true;
     let found = false;
     document.querySelectorAll(".result").forEach((r) => {
       if (found) return;
@@ -595,6 +699,356 @@
       .catch(drop);
   }
 
+  // ── "Best PC price" box (PC-game queries) ──────────────────────────────────
+
+  // Hosts that mark a result set as a PC-game query. Curated to game-specific
+  // domains (Metacritic is deliberately excluded — it also covers film/TV and
+  // would collide with the watch box). The box self-cancels when no offers are
+  // found, so a stray match costs at most one cancelled fetch.
+  const GAME_HOSTS = ["store.steampowered.com", "steampowered.com", "steamcommunity.com",
+    "gog.com", "epicgames.com", "store.epicgames.com", "igdb.com", "pcgamingwiki.com",
+    "gamefaqs.gamespot.com", "howlongtobeat.com", "isthereanydeal.com",
+    "gg.deals", "opencritic.com", "protondb.com"];
+
+  // An explicit "buy/price/cheapest … pc/steam" or "steam/cd key" phrasing is
+  // also game-shopping intent even when the result set is generic.
+  const GAME_QUERY_RE = /\bcd\s*keys?\b|\b(?:steam|gog|epic|game)\s+keys?\b|\bpc\s+game\b|\b(?:buy|price|prices|cheapest|deal|deals)\b[\s\S]*\b(?:pc|steam|game)\b|\b(?:pc|steam|game)\b[\s\S]*\b(?:buy|price|prices|cheapest|deal|deals)\b/i;
+
+  function isGamePage() {
+    if (GAME_QUERY_RE.test(currentQuery())) return true;
+    let found = false;
+    document.querySelectorAll(".result").forEach((r) => {
+      if (found) return;
+      const h = hostnameOf(resultUrl(r));
+      if (h && GAME_HOSTS.some((e) => h === e || h.endsWith("." + e))) found = true;
+    });
+    return found;
+  }
+
+  function gameRow(o, newTab) {
+    const a = document.createElement("a");
+    a.className = "serp-game-row";
+    a.href = o.url || "#";
+    if (newTab) { a.target = "_blank"; a.rel = "noopener noreferrer"; } else a.rel = "noopener";
+    const cut = (o.cut && o.cut > 0) ? '<span class="serp-game-cut">-' + esc(o.cut) + "%</span>" : "";
+    const reg = (o.regular && o.cut && o.cut > 0)
+      ? '<span class="serp-game-regular">' + esc(fmtPrice(o.regular, o.currency)) + "</span>" : "";
+    a.innerHTML =
+      '<span class="serp-game-store"></span>' +
+      '<span class="serp-game-right">' + cut + reg +
+        '<span class="serp-game-price">' + esc(o.priceText || "") + "</span>" +
+      "</span>";
+    a.querySelector(".serp-game-store").textContent = o.store;
+    return a;
+  }
+
+  function gameSection(label, offers, newTab) {
+    if (!offers || !offers.length) return null;
+    const sec = document.createElement("div");
+    sec.className = "serp-game-section";
+    const lab = document.createElement("div");
+    lab.className = "serp-game-label";
+    lab.textContent = label;
+    sec.appendChild(lab);
+    const list = document.createElement("div");
+    list.className = "serp-game-list";
+    offers.forEach((o) => list.appendChild(gameRow(o, newTab)));
+    sec.appendChild(list);
+    return sec;
+  }
+
+  function fmtPrice(value, currency) {
+    const SYM = { GBP: "£", USD: "$", EUR: "€", JPY: "¥", AUD: "A$", CAD: "C$",
+      NZD: "NZ$", INR: "₹", BRL: "R$", PLN: "zł ", SEK: "kr ", NOK: "kr ", DKK: "kr " };
+    const sym = SYM[(currency || "").toUpperCase()] || "";
+    const amt = Number(value).toFixed(2);
+    return sym ? sym + amt : amt + " " + (currency || "");
+  }
+
+  function renderGameOffers(box, d, newTab) {
+    const head = box.querySelector(".serp-src-head");
+    const bits = [];
+    if (typeof d.metacritic === "number") bits.push("Metacritic " + esc(d.metacritic));
+    if (d.historicalLow && d.historicalLow.priceText)
+      bits.push("lowest ever " + esc(d.historicalLow.priceText));
+    const sub = bits.length ? ' <span class="serp-game-sub">· ' + bits.join(" · ") + "</span>" : "";
+    const titleHtml = ICON.game + "<span>" + _("Best PC price") + " · </span>";
+    if (d.moreUrl) {
+      const a = document.createElement("a");
+      a.className = "serp-game-head-title";
+      a.href = d.moreUrl;
+      if (newTab) { a.target = "_blank"; a.rel = "noopener noreferrer"; } else a.rel = "noopener";
+      a.innerHTML = esc(d.title) + sub;
+      head.innerHTML = titleHtml;
+      head.appendChild(a);
+    } else {
+      head.innerHTML = titleHtml + "<span>" + esc(d.title) + sub + "</span>";
+    }
+
+    const body = box.querySelector(".serp-game-body");
+    body.innerHTML = "";
+    const official = gameSection(_("Official stores"), d.official, newTab);
+    if (official) body.appendChild(official);
+    box.style.display = body.children.length ? "" : "none";
+  }
+
+  // Insert (once) a "Best PC price" box and fetch its offers. One-shot per page.
+  let _gameAttempted = false;
+  function ensureGameBox(wrap, newTab) {
+    if (_gameAttempted || document.getElementById("serp-game")) return;
+    const query = currentQuery();
+    if (!query) return;
+    _gameAttempted = true;
+
+    const box = document.createElement("div");
+    box.id = "serp-game";
+    box.className = "serp-src-group serp-src-game";
+    box.style.display = "none";
+    box.innerHTML =
+      '<div class="serp-src-head">' + ICON.game + "<span>" + _("Best PC price") + "</span></div>" +
+      '<div class="serp-game-body"><div class="serp-game-msg">' + _("Loading…") + "</div></div>";
+    wrap.insertBefore(box, wrap.firstChild);  // top of the sources column
+
+    function drop() {
+      box.remove();
+      if (wrap && !wrap.querySelector(".serp-src-group")) wrap.remove();
+    }
+
+    fetch("/game_offers?q=" + encodeURIComponent(query),
+          { headers: { Accept: "application/json" } })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d || d.type !== "game" || !(d.official && d.official.length)) {
+          drop();
+          return;
+        }
+        renderGameOffers(box, d, newTab);
+      })
+      .catch(drop);
+  }
+
+  // ── Currency converter card (currency-conversion queries) ──────────────────
+  // Detection vocabulary kept in sync with ai_summary.js (which suppresses its
+  // box for these queries) and the server-side currency_box.py resolver.
+  const FX_SYMBOLS = "$£€¥₹₩₽₺₪₫฿₴₦";
+  const FX_WORDS = new Set([
+    "usd","eur","gbp","jpy","aud","cad","chf","cny","hkd","nzd","sgd","inr",
+    "krw","mxn","brl","zar","rub","try","sek","nok","dkk","pln","thb","idr",
+    "huf","czk","ils","aed","sar","php","myr","ron","rmb",
+    "dollar","dollars","buck","bucks","pound","pounds","quid","sterling",
+    "euro","euros","yen","rupee","rupees","won","yuan","renminbi","franc",
+    "francs","peso","pesos","real","reais","rand","ruble","rubles","rouble",
+    "lira","ringgit","baht","shekel","dirham","riyal","zloty","krona","krone",
+  ]);
+
+  function fxSide(side) {
+    side = (side || "").toLowerCase().replace(/[0-9.,]+/g, "").trim();
+    for (const s of FX_SYMBOLS) if (side.indexOf(s) !== -1) return true;
+    side = side.replace(new RegExp("[" + FX_SYMBOLS.replace(/[$]/g, "\\$") + "]", "g"), "").trim();
+    if (!side) return false;
+    if (FX_WORDS.has(side)) return true;
+    return side.split(/\s+/).some((w) => FX_WORDS.has(w));
+  }
+
+  function isCurrencyQuery(q) {
+    if (!q) return false;
+    const m = q.match(/^\s*(?:convert\s+)?(.+?)\s+(?:into|in|to|=|->|→)\s+(.+?)\s*$/i);
+    if (!m) return false;
+    return fxSide(m[1]) && fxSide(m[2]);
+  }
+
+  function fxFmt(n) {
+    n = Number(n) || 0;
+    const a = Math.abs(n);
+    const max = a >= 1 ? 2 : a >= 0.01 ? 4 : 6;
+    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: Math.max(2, max) });
+  }
+
+  function fxShortDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return m ? m[3] + "/" + m[2] : "";
+  }
+
+  // Hand-rolled SVG area+line chart (dependency-free), styled like the screenshot:
+  // gridlines + right-hand value axis + a few date ticks, coloured by trend.
+  function fxChartSVG(series) {
+    if (!series || series.length < 2) return null;
+    const W = 320, H = 150, padL = 6, padR = 40, padT = 10, padB = 20;
+    const x0 = padL, x1 = W - padR, y0 = padT, y1 = H - padB;
+    const vals = series.map((p) => p.v);
+    let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    if (hi === lo) { hi += hi * 0.001 || 0.001; lo -= lo * 0.001 || 0.001; }
+    const pad = (hi - lo) * 0.12;
+    lo -= pad; hi += pad;
+    const n = series.length;
+    const X = (i) => x0 + (x1 - x0) * (i / (n - 1));
+    const Y = (v) => y1 - (y1 - y0) * ((v - lo) / (hi - lo));
+
+    const up = vals[n - 1] >= vals[0];
+    const color = vals[n - 1] === vals[0] ? "#4285f4" : up ? "#1a9c4a" : "#d23f31";
+    const gid = "fxg" + Math.random().toString(36).slice(2, 8);
+
+    let line = "M" + X(0).toFixed(1) + " " + Y(vals[0]).toFixed(1);
+    for (let i = 1; i < n; i++) line += " L" + X(i).toFixed(1) + " " + Y(vals[i]).toFixed(1);
+    const area = line + " L" + x1.toFixed(1) + " " + y1.toFixed(1) +
+                 " L" + x0.toFixed(1) + " " + y1.toFixed(1) + " Z";
+
+    // 3 horizontal gridlines (lo / mid / hi) with right-hand value labels.
+    let grid = "";
+    for (let k = 0; k <= 2; k++) {
+      const v = lo + (hi - lo) * (k / 2);
+      const y = Y(v).toFixed(1);
+      grid += '<line class="serp-fx-gridline" x1="' + x0 + '" y1="' + y +
+              '" x2="' + x1 + '" y2="' + y + '"/>' +
+              '<text class="serp-fx-axis" x="' + (x1 + 4) + '" y="' + (Number(y) + 3) +
+              '">' + esc(fxFmt(v)) + "</text>";
+    }
+    // Date ticks: first / middle / last.
+    let ticks = "";
+    [[0, "start"], [Math.floor((n - 1) / 2), "middle"], [n - 1, "end"]].forEach(([i, anchor]) => {
+      const lbl = fxShortDate(series[i].d);
+      if (lbl) ticks += '<text class="serp-fx-axis" x="' + X(i).toFixed(1) + '" y="' + (H - 6) +
+                        '" text-anchor="' + anchor + '">' + esc(lbl) + "</text>";
+    });
+
+    return '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="exchange rate chart" preserveAspectRatio="none">' +
+      '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0" stop-color="' + color + '" stop-opacity="0.22"/>' +
+        '<stop offset="1" stop-color="' + color + '" stop-opacity="0"/>' +
+      "</linearGradient></defs>" +
+      grid +
+      '<path d="' + area + '" fill="url(#' + gid + ')" stroke="none"/>' +
+      '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+      ticks +
+      "</svg>";
+  }
+
+  // Build (and re-build, on selector change) the converter card body.
+  function renderCurrency(box, d, newQuery) {
+    const grid = document.createElement("div");
+    grid.className = "serp-fx-grid";
+
+    // Left: equals line, big result, editable amount + currency selectors.
+    const left = document.createElement("div");
+    const opts = (d.currencies || []).map((c) =>
+      '<option value="' + esc(c[0]) + '">' + esc(c[0] + " — " + c[1]) + "</option>").join("");
+    left.innerHTML =
+      '<div class="serp-fx-equals"></div>' +
+      '<div class="serp-fx-result"><span class="serp-fx-amt"></span> <span class="serp-fx-cur"></span></div>' +
+      '<div class="serp-fx-fields">' +
+        '<div class="serp-fx-row">' +
+          '<input class="serp-fx-input serp-fx-from-amt" type="number" inputmode="decimal" min="0" step="any" aria-label="amount">' +
+          '<select class="serp-fx-select serp-fx-from-cur" aria-label="from currency">' + opts + "</select>" +
+        "</div>" +
+        '<div class="serp-fx-row">' +
+          '<input class="serp-fx-input serp-fx-to-amt" type="number" inputmode="decimal" min="0" step="any" aria-label="converted amount">' +
+          '<select class="serp-fx-select serp-fx-to-cur" aria-label="to currency">' + opts + "</select>" +
+        "</div>" +
+      "</div>";
+
+    // Right: chart (or a graceful note when the ECB feed lacks the pair).
+    const right = document.createElement("div");
+    right.className = "serp-fx-chart";
+    const svg = fxChartSVG(d.series);
+    if (svg) {
+      right.innerHTML = svg +
+        '<div class="serp-fx-rateline">1 ' + esc(d.from) + " = " + esc(fxFmt(d.rate)) + " " + esc(d.to) + "</div>";
+    } else {
+      right.innerHTML = '<div class="serp-fx-chart-empty">' +
+        esc("1 " + d.from + " = " + fxFmt(d.rate) + " " + d.to + " · chart unavailable for this pair") + "</div>";
+    }
+
+    grid.appendChild(left);
+    grid.appendChild(right);
+    box.innerHTML = "";
+    box.appendChild(grid);
+
+    const equals = left.querySelector(".serp-fx-equals");
+    const bigAmt = left.querySelector(".serp-fx-amt");
+    const bigCur = left.querySelector(".serp-fx-cur");
+    const fromAmt = left.querySelector(".serp-fx-from-amt");
+    const toAmt = left.querySelector(".serp-fx-to-amt");
+    const fromCur = left.querySelector(".serp-fx-from-cur");
+    const toCur = left.querySelector(".serp-fx-to-cur");
+    fromCur.value = d.from;
+    toCur.value = d.to;
+
+    function paint(amount) {
+      const result = amount * d.rate;
+      equals.textContent = fxFmt(amount) + " " + d.fromName + " equals";
+      bigAmt.textContent = fxFmt(result);
+      bigCur.textContent = d.toName;
+      toAmt.value = Number(result.toFixed(4));
+    }
+    fromAmt.value = d.amount;
+    paint(d.amount);
+
+    fromAmt.addEventListener("input", () => {
+      const a = parseFloat(fromAmt.value);
+      paint(isFinite(a) && a >= 0 ? a : 0);
+    });
+    toAmt.addEventListener("input", () => {
+      const r = parseFloat(toAmt.value);
+      const a = isFinite(r) && r >= 0 && d.rate ? r / d.rate : 0;
+      fromAmt.value = Number(a.toFixed(4));
+      equals.textContent = fxFmt(a) + " " + d.fromName + " equals";
+      bigAmt.textContent = fxFmt(r >= 0 ? r : 0);
+      bigCur.textContent = d.toName;
+    });
+    function reconvert() {
+      const a = parseFloat(fromAmt.value);
+      newQuery((isFinite(a) && a > 0 ? a : 1) + " " + fromCur.value + " to " + toCur.value);
+    }
+    fromCur.addEventListener("change", reconvert);
+    toCur.addEventListener("change", reconvert);
+  }
+
+  // Suppress the AI-summary box and the bundled engine's text answer — the card
+  // is the answer for a currency query.
+  function fxHideDuplicates() {
+    const ai = document.getElementById("ai-summary-wrapper");
+    if (ai) ai.remove();
+    const answers = document.getElementById("answers");
+    if (answers) answers.style.display = "none";
+  }
+
+  // Insert (once) the converter card at the top of the results column and fetch
+  // the conversion. One-shot per page; re-fetches on selector change.
+  let _currencyAttempted = false;
+  function ensureCurrencyBox() {
+    if (_currencyAttempted || document.getElementById("serp-currency")) return;
+    const results = document.getElementById("results");
+    if (!results) return;
+    const query = currentQuery();
+    if (!query || !isCurrencyQuery(query)) return;
+    _currencyAttempted = true;
+
+    const box = document.createElement("div");
+    box.id = "serp-currency";
+    box.style.display = "none";
+    results.insertBefore(box, results.firstChild);
+
+    function load(q, isInitial) {
+      fetch("/currency_convert?q=" + encodeURIComponent(q),
+            { headers: { Accept: "application/json" } })
+        .then((r) => r.json())
+        .then((d) => {
+          if (!d || d.type !== "currency") {
+            // Not a currency query after all — drop the card. On the initial
+            // load the AI summary was suppressed up-front by ai_summary.js; this
+            // only happens for contrived inputs, so leaving no box is acceptable.
+            if (isInitial) box.remove();
+            return;
+          }
+          fxHideDuplicates();
+          renderCurrency(box, d, (nq) => load(nq, false));
+          box.style.display = "";
+        })
+        .catch(() => { if (isInitial) box.remove(); });
+    }
+    load(query, true);
+  }
+
   // Minimal gettext shim — the SERP is rendered server-side already, so these
   // strings stay English unless a translation hook is added later.
   function _(s) { return s; }
@@ -607,13 +1061,14 @@
     const newTab = !!document.querySelector(
       '.result h3 a[target="_blank"], .result a.url_header[target="_blank"]');
     const wantWatch = isEntertainmentPage();
+    const wantGame = isGamePage();
 
     let wrap = document.getElementById("serp-sources");
     if (!wrap) {
       const items = collectMatches();
       const reddit = items.filter((it) => it.kind === "reddit");
       const github = items.filter((it) => it.kind === "github");
-      if (!reddit.length && !github.length && !wantWatch) return;
+      if (!reddit.length && !github.length && !wantWatch && !wantGame) return;
 
       wrap = document.createElement("div");
       wrap.id = "serp-sources";
@@ -629,7 +1084,10 @@
       else results.insertBefore(wrap, results.firstChild);
     }
 
-    // The watch box goes above the Reddit/GitHub groups (cheapest-first offers).
+    // Offer boxes sit above the Reddit/GitHub groups (cheapest-first). The game
+    // box is inserted first, then the watch box, so on the rare query that is
+    // both, "where to watch" ends up on top.
+    if (wantGame) ensureGameBox(wrap, newTab);
     if (wantWatch) ensureWatchBox(wrap, newTab);
   }
 
@@ -660,6 +1118,7 @@
   // ── Orchestration ──────────────────────────────────────────────────────────
 
   function enhanceAll() {
+    ensureCurrencyBox();
     buildTopSection();
     enhanceCopyLinks(document);
     enhanceCards(document);

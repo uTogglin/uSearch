@@ -277,6 +277,12 @@ plugins:
   searx.plugins.watch_offers.SXNGPlugin:
     active: true
 
+  searx.plugins.game_offers.SXNGPlugin:
+    active: true
+
+  searx.plugins.currency_box.SXNGPlugin:
+    active: true
+
 
 # Configuration of the "Privacy redirect plugin":
 #
@@ -344,6 +350,55 @@ watch_offers:
   default_region: GB        # ISO-3166 alpha-2 fallback when no locale is present
   rate_limit_capacity: 15   # per-IP burst size
   rate_limit_rate: 1.0      # per-IP tokens refilled per second
+
+
+# Configuration of the "Game Offers plugin" ("Best PC price" box):
+#
+# For PC-game queries, queries CheapShark + IsThereAnyDeal server-side and
+# renders a cheapest-first box of official / authorised PC stores (Steam, GOG,
+# Humble, Fanatical, GreenManGaming, Epic, …) at the top of the results column.
+# Prices are normalised to the user's local currency (CheapShark is USD and
+# converted with a daily-cached FX rate). The browser only ever talks to this
+# origin (privacy-preserving); store logos are not loaded. Each source is
+# best-effort, so a dead source never breaks the box.
+game_offers:
+  timeout: 6                # upstream request timeout (seconds)
+  cache_ttl: 21600          # cache offers for 6 hours (prices change slowly)
+  cache_max: 1000           # max cached entries
+  max_offers: 8             # max store rows returned to the client
+  default_region: GB        # ISO-3166 alpha-2 fallback when no locale is present
+  default_currency: GBP     # display currency when the locale's country is unknown
+  rate_limit_capacity: 15   # per-IP burst size
+  rate_limit_rate: 1.0      # per-IP tokens refilled per second
+  fx_ttl: 86400             # cache the USD FX table for a day
+
+  # Per-source toggles.
+  enable_cheapshark: true   # keyless; official stores (USD, converted)
+  enable_itad: true         # official stores + all-time low (needs itad_api_key)
+
+  # IsThereAnyDeal API key. Read from this setting first, then the ITAD_API_KEY
+  # env var. Free key from https://isthereanydeal.com/dev/app/ . Leave empty to
+  # use the env var (or to run on CheapShark alone, without ITAD).
+  itad_api_key: ""
+
+
+# Configuration of the "Currency Box plugin" (FX converter card):
+#
+# For currency-conversion queries ("25 gbp to usd", "euro to yen") renders a
+# converter card at the top of the results column: the converted amount, an
+# editable amount + currency selectors, and a ~30-day rate chart. The chart data
+# (an EUR-base matrix of every ECB currency) is pulled from Frankfurter
+# (https://frankfurter.dev) — a free, keyless feed — ONLY when the VM is taken
+# out of suspension (plus one background seed on cold start), then held in memory
+# and served by cross-division, so a search never touches the network. Pairs the
+# ECB doesn't publish fall back to searx/data/fx_rates.json for the number and
+# show no chart.
+currency_box:
+  base_url: "https://api.frankfurter.dev/v1"
+  timeout: 8                # upstream request timeout (seconds), resume pull only
+  days: 30                  # chart window, in calendar days
+  rate_limit_capacity: 30   # per-IP burst size
+  rate_limit_rate: 3.0      # per-IP tokens refilled per second
 
 
 # Configuration of the "AI Summary plugin" (OpenRouter):
@@ -2397,18 +2452,24 @@ engines:
     shortcut: sp
     startpage_categ: web
     categories: [general, web]
+    # Startpage just resells Google results and is ~always captcha-blocked for us,
+    # so it adds no unique coverage while its failures destabilise ranking.
+    # Disabled from the default mix; still reachable via the !sp bang.
+    disabled: true
 
   - name: startpage news
     engine: startpage
     startpage_categ: news
     categories: [news, web]
     shortcut: spn
+    disabled: true
 
   - name: startpage images
     engine: startpage
     startpage_categ: images
     categories: [images, web]
     shortcut: spi
+    disabled: true
 
   - name: steam
     engine: steam
