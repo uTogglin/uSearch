@@ -504,6 +504,7 @@ categories_as_tabs:
   science:
   files:
   social media:
+  3d print:
 
 engines:
   - name: 360search
@@ -2011,6 +2012,11 @@ engines:
   - name: pinterest
     engine: pinterest
     shortcut: pin
+
+  - name: printables
+    engine: printables
+    shortcut: prt
+    categories: [3d print]
 
   - name: piped
     engine: piped

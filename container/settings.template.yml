@@ -50,6 +50,8 @@ use_default_settings:
       - bandcamp
       # dictionaries
       - wiktionary
+      # 3d print
+      - printables
 
 # Per-engine overrides. hackernews ships `disabled: true` in the defaults, so
 # keep_only alone would include it but leave it inactive — flip it on here.
