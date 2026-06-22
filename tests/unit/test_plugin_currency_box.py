@@ -184,5 +184,28 @@ class CurrencyBuild(unittest.TestCase):
         self.assertIn("USD", codes)
 
 
+class CurrencyAnswer(unittest.TestCase):
+
+    def test_answer_text_from_matrix(self):
+        old = _set_matrix({"2026-06-21": {"USD": 1.12, "GBP": 0.84}})
+        try:
+            ans = cb.answer_for("25 gbp to usd")
+        finally:
+            _restore_matrix(old)
+        self.assertIsNotNone(ans)
+        text, _url = ans
+        rate = 1.12 / 0.84
+        self.assertEqual(text, f"25 GBP = {cb._fmt_amount(round(25 * rate, 4))} USD")
+
+    def test_answer_none_for_non_currency(self):
+        self.assertIsNone(cb.answer_for("back to school"))
+        self.assertIsNone(cb.answer_for("python tutorial"))
+
+    def test_fmt_amount_trims_zeros(self):
+        self.assertEqual(cb._fmt_amount(25.0), "25")
+        self.assertEqual(cb._fmt_amount(33.11), "33.11")
+        self.assertEqual(cb._fmt_amount(1500), "1,500")
+
+
 if __name__ == "__main__":
     unittest.main()

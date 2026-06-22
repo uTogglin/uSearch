@@ -391,6 +391,33 @@ def _dropdown(frm: str, to: str) -> "list[list[str]]":
     return [[c, n] for c, n in out.items()]
 
 
+def _fmt_amount(n: float) -> str:
+    """Compact number for the plain-text answer: grouped thousands, trailing
+    zeros trimmed ("25.0000" -> "25", "33.1100" -> "33.11")."""
+    s = f"{float(n):,.4f}".rstrip("0").rstrip(".")
+    return s or "0"
+
+
+def answer_for(query: str) -> "tuple[str, str] | None":
+    """Plain-text conversion for a currency query ("25 GBP = 33.11 USD"), or
+    None if the query isn't a currency conversion.
+
+    Uses only in-memory / on-disk data — it never calls upstream — so it is safe
+    on the request path.  The search flow uses this to answer currency queries
+    WITHOUT querying the (often captcha-blocked) engines; the rich card is drawn
+    client-side by serp_enhance.js, and this text is the no-JS fallback."""
+    parsed = _parse_query(query or "")
+    if parsed is None:
+        return None
+    amount, frm, to = parsed
+    series = _pair_series(frm, to)
+    rate = series[-1]["v"] if series else _cross_rate(frm, to)
+    if rate is None:
+        return None
+    text = f"{_fmt_amount(amount)} {frm} = {_fmt_amount(round(amount * rate, 4))} {to}"
+    return text, ""
+
+
 def _build(amount: float, frm: str, to: str) -> "dict | None":
     """Assemble the converter payload from in-memory data (no network call)."""
     series = _pair_series(frm, to)

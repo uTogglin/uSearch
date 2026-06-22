@@ -74,6 +74,26 @@ class Search:
         self.result_container.extend(None, results)  # pyright: ignore[reportArgumentType]
         return bool(results)
 
+    def search_currency(self) -> bool:
+        """uSearch: a currency-conversion query ("25 gbp to usd") is fully
+        answered by the converter card (currency_box plugin + serp_enhance.js),
+        so there's no point querying the (often captcha-blocked) engine providers
+        for it.  Detect it, add a plain-text answer as a no-JS fallback, and
+        short-circuit the engine dispatch entirely (mirrors search_answerers)."""
+        try:
+            from searx.plugins.currency_box import answer_for  # pylint: disable=import-outside-toplevel
+            from searx.result_types.answer import Answer  # pylint: disable=import-outside-toplevel
+
+            ans = answer_for(self.search_query.query or "")
+        except Exception:  # pylint: disable=broad-except — never break search
+            logger.exception("currency short-circuit failed")
+            return False
+        if ans is None:
+            return False
+        text, url = ans
+        self.result_container.answers.add(Answer(answer=text, url=url) if url else Answer(answer=text))
+        return True
+
     # do search-request
     def _get_requests(self) -> tuple[list[tuple[str, str, RequestParams]], float]:
         # init vars
@@ -174,8 +194,9 @@ class Search:
     def search(self) -> ResultContainer:
         self.start_time = default_timer()
         if not self.search_external_bang():
-            if not self.search_answerers():
-                self.search_standard()
+            if not self.search_currency():
+                if not self.search_answerers():
+                    self.search_standard()
         return self.result_container
 
 
