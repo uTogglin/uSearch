@@ -17,9 +17,33 @@ cfg_schema = 1
 
 db_url = "/var/cache/searxng/faviconcache.db"
 
-# Cap the cache at 900 MB (default is 50 MB). The volume is 1 GB, so this leaves
-# ~100 MB of headroom — the limit is only enforced at each maintenance interval
-# (hourly) and can be exceeded between runs, so the buffer matters. At 20 KB max
-# per BLOB the per-interval overshoot is bounded well under that headroom.
-# 900 * 1024 * 1024 = 943718400
-LIMIT_TOTAL_BYTES = 943718400
+# Hard requirement: the DB file must never exceed 950 MB (1 GB volume). Two facts
+# make this a function of the *data* cap, not just the cap itself:
+#   * LIMIT_TOTAL_BYTES caps blob DATA (SUM(bytes_c)), not the file. SQLite adds
+#     page/index/blob_map overhead and a WAL on top.
+#   * the file never shrinks on its own — WAL mode, no auto_vacuum — so its size
+#     tracks the HIGH-WATER MARK of data ever held, and the cap is only enforced
+#     at each maintenance run (overshoot accumulates between runs).
+# So we cap data at 850 MB and run maintenance every 20 min: 850 MB data + SQLite
+# overhead + a small 20-min overshoot + truncated WAL stays well under 950 MB,
+# with no risky in-place VACUUM (which would need ~2x the file size in free
+# volume space we don't have). 850 * 1024 * 1024 = 891289600
+LIMIT_TOTAL_BYTES = 891289600
+
+# Enforce the cap every 20 min instead of hourly so the between-sweep overshoot
+# above LIMIT_TOTAL_BYTES stays small — important because the file keeps the
+# high-water mark. 20 * 60 = 1200 sec.
+MAINTENANCE_PERIOD = 1200
+
+# Hold resolved favicons for 180 days (default is 30). We never cache the empty
+# placeholder anymore, so the cache holds only real icons — which rarely change —
+# and a longer hold keeps the warm cache (and thus inlined-into-HTML coverage)
+# from decaying on this low-traffic, scale-to-zero box. 180 * 24 * 3600 sec.
+HOLD_TIME = 15552000
+
+# Allow favicons up to 40 KB to be cached (default is 20 KB). The new "direct"
+# resolver pulls a site's own favicon.ico / <link> icon, which is often a touch
+# larger than the aggregators' 32x32 PNGs; without the bump those icons would be
+# resolved fresh on every search instead of served from the warm cache. The
+# resolver itself rejects anything over 30 KB, so this leaves headroom. 40 * 1024.
+BLOB_MAX_BYTES = 40960

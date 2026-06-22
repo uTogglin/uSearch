@@ -201,8 +201,14 @@ def search_favicon(resolver: str, authority: str) -> tuple[None | bytes, None | 
         return None, None
 
     if data is None or mime is None:
-        # Definitive miss (provider is sure there is no favicon) — safe to cache.
-        data, mime = (None, None)
+        # No favicon found. Do NOT cache this placeholder/negative result. A
+        # cached miss freezes the blank icon for the whole hold time, and even a
+        # "definitive" 404 from a provider is often just incomplete coverage that
+        # another provider (or a later crawl) would have. Leaving it uncached
+        # means every iconless domain is retried on the next search — coverage
+        # heals itself as providers catch up — at the cost of re-walking the
+        # resolver chain for genuinely-iconless domains each time.
+        return None, None
 
     cache.CACHE.set(resolver, authority, mime, data)
     return data, mime

@@ -393,6 +393,14 @@ CREATE TABLE IF NOT EXISTS blob_map (
 
         with self.connect() as conn:
 
+            # Sweep cached negatives (the empty placeholder). The proxy no longer
+            # writes these, but older builds did, and HOLD_TIME is long — without
+            # this sweep a domain that once missed would stay frozen blank for the
+            # whole hold time instead of being retried. Dropping the map row turns
+            # it back into a genuine cache miss that re-walks the resolver chain.
+            res = conn.execute("DELETE FROM blob_map WHERE sha256 = ?", (FALLBACK_ICON,))
+            logger.debug("dropped %s cached-negative (placeholder) blob_map items from db", res.rowcount)
+
             # drop items not in HOLD time
             res = conn.execute(
                 f"DELETE FROM blob_map"
