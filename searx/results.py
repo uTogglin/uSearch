@@ -6,12 +6,17 @@ import typing as t
 import warnings
 from collections import defaultdict
 from threading import RLock
+from urllib.parse import quote_plus
+
+from flask_babel import gettext
 
 from searx import logger as log
+from searx import popularity
+from searx import intent_boost
 import searx.engines
 from searx.metrics import histogram_observe, counter_add
 from searx.result_types import Result, LegacyResult, MainResult
-from searx.result_types.answer import AnswerSet, BaseAnswer
+from searx.result_types.answer import AnswerSet, BaseAnswer, Answer
 
 
 def calculate_score(
@@ -34,6 +39,15 @@ def calculate_score(
             score += weight
         else:
             score += weight / position
+
+    # uSearch: fold in a generic domain-popularity (Tranco) authority signal so
+    # well-trafficked sites get a mild nudge above obscure ones. Multiplicative,
+    # so a zeroed ('low' priority) result stays zeroed and an irrelevant-but-
+    # popular site can't float up from nothing.
+    if score:
+        parsed_url = getattr(result, 'parsed_url', None)
+        if parsed_url is not None:
+            score *= popularity.boost(parsed_url.netloc)
 
     return score
 
@@ -187,6 +201,64 @@ class ResultContainer:
             result.score = calculate_score(result, result.priority)
             for eng_name in result.engines:
                 counter_add(result.score, 'engine', eng_name, 'score')
+
+        self._apply_intent_ranking()
+
+    def _apply_intent_ranking(self):
+        """uSearch: query-intent re-rank over the whole result set.
+
+        For now: if this looks like a film/TV query, push "where to watch"
+        results up and pay-to-own / shopping results down (see
+        :py:mod:`searx.intent_boost`)."""
+        results = list(self.main_results_map.values())
+
+        hostnames: set[str] = set()
+        for result in results:
+            parsed_url = getattr(result, 'parsed_url', None)
+            if parsed_url is not None and parsed_url.netloc:
+                hostnames.add(parsed_url.netloc.lower())
+
+        if not intent_boost.is_entertainment(hostnames):
+            return
+
+        for result in results:
+            parsed_url = getattr(result, 'parsed_url', None)
+            if parsed_url is None:
+                continue
+            mult = intent_boost.multiplier(parsed_url.netloc)
+            if mult != 1.0:
+                result.score *= mult
+
+    def inject_where_to_watch(self, search_query):
+        """uSearch: for film/TV queries, add a JustWatch "where to watch" answer.
+
+        No engine returns JustWatch on its own, so for entertainment-intent
+        queries we synthesise an answer-box link to JustWatch's search for the
+        title (region derived from the search locale).  Skipped if the engines
+        already surfaced a JustWatch result."""
+        hostnames: set[str] = set()
+        for result in self.main_results_map.values():
+            parsed_url = getattr(result, 'parsed_url', None)
+            if parsed_url is not None and parsed_url.netloc:
+                hostnames.add(parsed_url.netloc.lower())
+
+        if not intent_boost.is_entertainment(hostnames):
+            return
+        if any('justwatch.com' in h for h in hostnames):
+            return
+
+        query = (getattr(search_query, 'query', '') or '').strip()
+        if not query:
+            return
+
+        region = intent_boost.justwatch_region(getattr(search_query, 'lang', None))
+        url = f"https://www.justwatch.com/{region}/search?q={quote_plus(query)}"
+        self.answers.add(
+            Answer(
+                answer=gettext('Where to watch "{title}" — streaming, rent or buy (JustWatch)').format(title=query),
+                url=url,
+            )
+        )
 
     def get_ordered_results(self) -> list[MainResult | LegacyResult]:
         """Returns a sorted list of results to be displayed in the main result

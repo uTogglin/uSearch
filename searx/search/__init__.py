@@ -205,5 +205,6 @@ class SearchWithPlugins(Search):
 
         searx.plugins.STORAGE.post_search(self.request, self)
         self.result_container.close()
+        self.result_container.inject_where_to_watch(self.search_query)
 
         return self.result_container
