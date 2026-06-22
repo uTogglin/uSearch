@@ -28,6 +28,7 @@ jobs:
         fetch:
           - update_ahmia_blacklist.py
           - update_currencies.py
+          - update_fx_rates.py
           - update_external_bangs.py
           - update_firefox_version.py
           - update_engine_traits.py
