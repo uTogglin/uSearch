@@ -6,9 +6,11 @@ from types import TracebackType
 
 import asyncio
 import logging
+import os
 import random
 from ssl import SSLContext
 import threading
+import time
 
 import httpx
 from httpx_socks import AsyncProxyTransport
@@ -210,6 +212,97 @@ def get_loop() -> asyncio.AbstractEventLoop:
     return LOOP
 
 
+# --- VM suspend/resume recovery -------------------------------------------
+#
+# When the host suspends the VM (e.g. Fly.io ``auto_stop_machines = "suspend"``,
+# which snapshots RAM instead of a clean shutdown), the long-lived httpx
+# connection pools come back with sockets whose peers are long gone. Reusing
+# those dead sockets makes every engine request hang until timeout -> a search
+# returns 0 results ~12s after the box wakes. Fly itself warns: "On resume, the
+# machine thinks its network connections are still live. External systems may
+# disagree."
+#
+# There is no in-guest resume signal, so we detect the resume by watching the
+# wall clock: the snapshot freezes the guest, and on resume NTP yanks
+# CLOCK_REALTIME forward by the suspend duration while CLOCK_MONOTONIC just
+# continues. A large forward divergence between the two is the resume signal;
+# we react by closing every pooled client so the next request dials fresh.
+
+RESUME_DRIFT_THRESHOLD = 5.0
+"""Seconds of wall-vs-monotonic forward drift that signals a VM resume. Real
+suspends last at least the autostop idle delay (minutes), so this sits far above
+any GC pause or NTP micro-step yet far below any genuine suspend."""
+
+_RESUME_CHECK_INTERVAL = 1.0
+
+# Extra work to run once a VM resume is detected, beyond dropping HTTP pools —
+# e.g. game_offers re-pulls foreign-exchange rates so the first search after a
+# long sleep prices in current rates, not a snapshot that is now days stale.
+# Kept here (rather than importing plugins) so the network layer stays free of
+# upward dependencies; callers register with register_resume_callback().
+_RESUME_CALLBACKS: list = []
+_RESUME_CALLBACKS_LOCK = threading.Lock()
+
+
+def register_resume_callback(callback) -> None:
+    """Register a zero-arg callable to run (best-effort) after each VM resume.
+
+    Idempotent per callable, so a module re-imported under a different name does
+    not stack duplicates.  Safe to call before or after the watchdog starts."""
+    with _RESUME_CALLBACKS_LOCK:
+        if callback not in _RESUME_CALLBACKS:
+            _RESUME_CALLBACKS.append(callback)
+
+
+def _run_resume_callbacks() -> None:
+    with _RESUME_CALLBACKS_LOCK:
+        callbacks = list(_RESUME_CALLBACKS)
+    for callback in callbacks:
+        try:
+            callback()
+        except Exception:  # pylint: disable=broad-except
+            logger.exception('resume callback %r failed', getattr(callback, '__name__', callback))
+
+
+def _resume_drift(prev_wall: float, prev_mono: float, wall: float, mono: float) -> float:
+    """Forward jump of the wall clock relative to the monotonic clock between two
+    samples. ~0 in normal operation; ≈ the suspend duration right after a resume."""
+    return (wall - prev_wall) - (mono - prev_mono)
+
+
+def reset_networks_after_resume() -> None:
+    """Close every pooled httpx client so the next request opens fresh sockets."""
+    # Lazy import: network.py imports this module, so a module-scope import would
+    # be circular.
+    from searx.network.network import Network  # pylint: disable=import-outside-toplevel
+
+    loop = get_loop()
+    if loop is None:
+        return
+    try:
+        future = asyncio.run_coroutine_threadsafe(Network.aclose_all(), loop)
+        future.result(10)
+    except Exception:  # pylint: disable=broad-except
+        logger.exception('failed to reset HTTP pools after resume')
+
+
+def _resume_watchdog() -> None:
+    prev_wall = time.time()
+    prev_mono = time.monotonic()
+    while True:
+        time.sleep(_RESUME_CHECK_INTERVAL)
+        wall = time.time()
+        mono = time.monotonic()
+        drift = _resume_drift(prev_wall, prev_mono, wall, mono)
+        prev_wall, prev_mono = wall, mono
+        if drift > RESUME_DRIFT_THRESHOLD:
+            # WARNING (not INFO) so it stays visible at SearXNG's default prod log
+            # level — a resume is infrequent and worth an operational breadcrumb.
+            logger.warning('detected %.0fs clock jump (VM resume); resetting HTTP pools', drift)
+            reset_networks_after_resume()
+            _run_resume_callbacks()
+
+
 def init():
     # log
     for logger_name in (
@@ -235,6 +328,15 @@ def init():
         daemon=True,
     )
     thread.start()
+
+    # Watchdog that drops stale connection pools after a VM suspend/resume.
+    # Disable on hosts that never suspend with SEARXNG_DISABLE_RESUME_WATCHDOG=1.
+    if os.environ.get('SEARXNG_DISABLE_RESUME_WATCHDOG', '').lower() not in ('1', 'true', 'yes'):
+        threading.Thread(
+            target=_resume_watchdog,
+            name='resume_watchdog',
+            daemon=True,
+        ).start()
 
 
 init()

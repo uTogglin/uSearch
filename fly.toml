@@ -5,13 +5,11 @@
 app = "usearch-degoog"
 primary_region = "iad"
 
-# Swap is essential here: on 256mb RAM the per-search memory spike (parsing
-# several engine responses at once) otherwise drives the box into memory-
-# pressure thrashing, which stalls the async loop and makes EVERY engine time
-# out (0 results after 10s+). Swap absorbs the spike. (Suspend isn't usable
-# with SearXNG anyway — it breaks the long-lived HTTP client — so the fact that
-# swap disables suspend costs us nothing.)
-swap_size_mb = 512
+# NOTE: no swap. Fly only suspends a Machine when it has no swap configured
+# (and <=2gb RAM, no GPU, no schedule), and we want suspend (see [http_service]).
+# At 512mb the per-search parsing spike is absorbed by RAM headroom directly and
+# rarely needed swap anyway; if OOM kills show up in the logs, bump [[vm]].memory
+# to 1024 rather than re-adding swap (swap would silently disable suspend).
 
 [build]
   dockerfile = "container/fly.dockerfile"
@@ -27,12 +25,14 @@ swap_size_mb = 512
 [http_service]
   internal_port = 8080
   force_https = true
-  # Use "stop" (full shutdown), NOT "suspend". Suspend snapshots the VM's RAM,
-  # but SearXNG holds a long-lived async httpx client; restoring it leaves dead
-  # sockets, so every engine request hangs to timeout -> searches return 0
-  # results after ~12s. A clean cold boot (~5s) starts a fresh process with
-  # working networking. Still scales compute to zero.
-  auto_stop_machines = "stop"
+  # "suspend" snapshots the VM's RAM so a resume is near-instant (~hundreds of
+  # ms) instead of a ~5s cold boot — much snappier first search after idle, and
+  # billed the same as "stop" (rootfs storage only, no CPU/RAM while suspended).
+  # Suspend restores stale TCP sockets in SearXNG's long-lived httpx pools, which
+  # would otherwise make every engine hang to timeout (0 results ~12s after
+  # wake). A resume watchdog (searx/network/client.py) detects the wake via the
+  # NTP wall-clock jump and drops the pools, so the next request dials fresh.
+  auto_stop_machines = "suspend"
   auto_start_machines = true
   min_machines_running = 0
 
@@ -43,7 +43,7 @@ swap_size_mb = 512
 
 [[vm]]
   size = "shared-cpu-1x"
-  # 512mb RAM + the swap above. ~28 engines across categories
-  # (see settings.template.yml); the extra headroom over 256mb absorbs the
-  # per-search parsing spike directly so it rarely has to touch swap.
+  # 512mb RAM, no swap (swap would disable suspend). ~28 engines across
+  # categories (see settings.template.yml); the headroom over 256mb absorbs the
+  # per-search parsing spike directly. Must stay <=2gb for suspend to be allowed.
   memory = "512mb"
