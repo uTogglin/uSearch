@@ -199,6 +199,11 @@ SCHEMA: dict[str, t.Any] = {
         'languages': SettingSublistValue(SXNG_LOCALE_TAGS, SXNG_LOCALE_TAGS),  # type: ignore
         'ban_time_on_fail': SettingsValue(numbers.Real, 5),
         'max_ban_time_on_fail': SettingsValue(numbers.Real, 120),
+        # How many times to re-query an engine through the fallback proxy after
+        # it is blocked on the direct IP.  Each attempt opens a fresh proxy
+        # tunnel, so a rotating residential pool lands on a new exit IP each
+        # time (see outgoing.fallback_proxies / searx/network/network.py).
+        'proxy_fallback_attempts': SettingsValue(int, 3, 'SEARXNG_PROXY_FALLBACK_ATTEMPTS'),
         'suspended_times': {
             'SearxEngineAccessDenied': SettingsValue(numbers.Real, 86400),
             'SearxEngineCaptcha': SettingsValue(numbers.Real, 86400),
@@ -260,6 +265,11 @@ SCHEMA: dict[str, t.Any] = {
         'max_redirects': SettingsValue(int, 30),
         'retries': SettingsValue(int, 0),
         'proxies': SettingsValue((None, str, dict), None),
+        # Fallback proxy used *only* to re-query an engine after it is blocked
+        # (captcha / HTTP 429) on the direct IP.  Leave None to build it from the
+        # PROXY_HOST / PROXY_PORT / PROXY_USERNAME / PROXY_PASSWORD env vars (see
+        # searx/network/network.py:_get_fallback_proxies).
+        'fallback_proxies': SettingsValue((None, str, dict), None),
         'source_ips': SettingsValue((None, str, list), None),
         # Tor configuration
         'using_tor_proxy': SettingsValue(bool, False),

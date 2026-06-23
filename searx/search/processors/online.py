@@ -7,10 +7,12 @@ import typing as t
 
 from timeit import default_timer
 import asyncio
+import copy
 import ssl
 import httpx
 
 import searx.network
+from searx import get_setting
 from searx.utils import gen_useragent
 from searx.exceptions import (
     SearxEngineAccessDeniedException,
@@ -114,6 +116,72 @@ class OnlineProcessor(EngineProcessor):
     """Processor class for ``online`` engines."""
 
     engine_type: str = "online"
+
+    def __init__(self, engine: t.Any):
+        super().__init__(engine)
+        # When an engine is blocked (captcha / HTTP 429) on the direct IP we
+        # re-query it through the fallback proxy.  On success we keep routing the
+        # engine through the proxy until this monotonic deadline, so the next
+        # searches go straight to the proxy instead of wasting a doomed direct
+        # request every time.  0 means "use the direct network".
+        self._prefer_proxy_until: float = 0.0
+
+    def _proxy_network_name(self) -> str | None:
+        """Name of this engine's fallback-proxy twin network, or ``None`` if no
+        fallback proxy is configured (see searx/network/network.py)."""
+        name = f"{self.engine.name}__proxy"
+        return name if searx.network.get_network(name) is not None else None
+
+    def _retry_via_proxy(
+        self,
+        proxy_name: str,
+        query: str,
+        params: "OnlineParams",
+        result_container: "ResultContainer",
+        start_time: float,
+        timeout_limit: float,
+    ) -> bool:
+        """Re-query the engine through the fallback proxy after a block on the
+        direct IP.  Returns ``True`` as soon as one attempt goes through (results
+        added to the container), ``False`` if every attempt is blocked too.
+
+        The proxy twin disables keep-alive (see network.py), so each attempt
+        opens a fresh tunnel and the rotating residential pool hands back a new
+        exit IP -- retrying a few times makes it very likely to land on an IP the
+        engine hasn't rate-limited.  ``params`` is the pristine (pre-request)
+        snapshot; it is deep-copied per attempt because ``engine.request()``
+        mutates it.
+        """
+        searx.network.set_context_network_name(proxy_name)
+        attempts = max(1, int(get_setting("search.proxy_fallback_attempts")))
+        for attempt in range(1, attempts + 1):
+            if attempt > 1 and (default_timer() - start_time) >= timeout_limit:
+                self.logger.warning("%s fallback proxy: out of time after %d attempt(s)", self.engine.name, attempt - 1)
+                break
+            self.logger.warning(
+                "%s blocked on direct IP, re-querying via fallback proxy (attempt %d/%d)",
+                self.engine.name,
+                attempt,
+                attempts,
+            )
+            try:
+                search_results = self._search_basic(query, copy.deepcopy(params))
+                self.extend_container(result_container, start_time, search_results)
+            except (
+                SearxEngineCaptchaException,
+                SearxEngineTooManyRequestsException,
+                SearxEngineAccessDeniedException,
+            ) as e:
+                # blocked on this exit IP too -- rotate (new tunnel) and retry
+                self.logger.warning("%s fallback proxy attempt %d blocked: %s", self.engine.name, attempt, e)
+                continue
+            except Exception as e:  # pylint: disable=broad-except
+                self.logger.warning("%s fallback proxy attempt %d failed: %s", self.engine.name, attempt, e)
+                continue
+            # Stick with the proxy for a while so we stop hammering the blocked IP.
+            self._prefer_proxy_until = default_timer() + float(get_setting("search.max_ban_time_on_fail"))
+            return True
+        return False
 
     def init_engine(self) -> bool:
         """This method is called in a thread, and before the base method is
@@ -248,6 +316,16 @@ class OnlineProcessor(EngineProcessor):
     ):
         self.init_network_in_thread(start_time, timeout_limit)
 
+        proxy_name = self._proxy_network_name()
+        # While the direct IP is blocked, skip it and go straight through the
+        # proxy.  Reverts to the direct network automatically once the cooldown
+        # (set in _retry_via_proxy) expires.
+        prefer_proxy = proxy_name is not None and default_timer() < self._prefer_proxy_until
+        if prefer_proxy:
+            searx.network.set_context_network_name(proxy_name)  # type: ignore[arg-type]
+        # engine.request() mutates params, so snapshot it for a possible retry.
+        retry_params = copy.deepcopy(params) if (proxy_name is not None and not prefer_proxy) else None
+
         try:
             # send requests and parse the results
             search_results = self._search_basic(query, params)
@@ -277,6 +355,18 @@ class OnlineProcessor(EngineProcessor):
             SearxEngineTooManyRequestsException,
             SearxEngineAccessDeniedException,
         ) as e:
+            # Blocked on the direct IP: re-query once through the fallback proxy
+            # before giving up (only if a proxy twin exists and we weren't
+            # already on it).
+            if retry_params is not None and self._retry_via_proxy(
+                proxy_name,  # type: ignore[arg-type]
+                query,
+                retry_params,
+                result_container,
+                start_time,
+                timeout_limit,
+            ):
+                return
             self.handle_exception(result_container, e, suspend=True)
             self.logger.exception(e.message)
         except Exception as e:  # pylint: disable=broad-except

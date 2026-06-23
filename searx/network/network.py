@@ -11,7 +11,9 @@ from collections.abc import Generator
 import atexit
 import asyncio
 import ipaddress
+import os
 from itertools import cycle
+from urllib.parse import quote
 
 import httpx
 
@@ -315,6 +317,70 @@ def get_network(name: str | None = None) -> "Network":
     return NETWORKS.get(name or DEFAULT_NAME)  # pyright: ignore[reportReturnType]
 
 
+def _get_fallback_proxies() -> str | dict[str, str] | None:
+    """Proxy used only to re-query an engine once it is blocked on the direct IP.
+
+    Priority:
+    1. ``outgoing.fallback_proxies`` in settings (a full proxy URL or a httpx
+       ``{pattern: url}`` mapping), if set.
+    2. Otherwise assembled from the ``PROXY_HOST`` / ``PROXY_PORT`` /
+       ``PROXY_USERNAME`` / ``PROXY_PASSWORD`` (and optional ``PROXY_SCHEME``,
+       default ``http``) environment variables -- this is how the credentials
+       are injected as Fly secrets.
+
+    Returns ``None`` when no fallback proxy is configured.
+    """
+    # pylint: disable=import-outside-toplevel
+    from searx import settings
+
+    configured = settings['outgoing'].get('fallback_proxies')
+    if configured:
+        return configured
+
+    host = (os.environ.get('PROXY_HOST') or '').strip()
+    if not host:
+        return None
+
+    scheme = (os.environ.get('PROXY_SCHEME') or 'http').strip() or 'http'
+    port = (os.environ.get('PROXY_PORT') or '').strip()
+    user = os.environ.get('PROXY_USERNAME') or ''
+    password = os.environ.get('PROXY_PASSWORD') or ''
+
+    netloc = f"{host}:{port}" if port else host
+    if user:
+        auth = quote(user, safe='')
+        if password:
+            auth = f"{auth}:{quote(password, safe='')}"
+        netloc = f"{auth}@{netloc}"
+    return f"{scheme}://{netloc}"
+
+
+def _clone_network_with_proxies(net: "Network", proxies: str | dict[str, str], logger_name: str) -> "Network":
+    """A twin of ``net`` with the same parameters but routed through ``proxies``.
+
+    Keep-alive is disabled (``max_keepalive_connections=0``): a rotating
+    residential proxy assigns the upstream IP per *connection*, so reusing a
+    pooled tunnel would pin one IP and defeat rotation.  Forcing a fresh
+    connection per request lets each retry land on a new exit IP -- which is the
+    whole point of falling back to the proxy after a block.
+    """
+    return Network(
+        enable_http=net.enable_http,
+        verify=net.verify,
+        enable_http2=net.enable_http2,
+        max_connections=net.max_connections,
+        max_keepalive_connections=0,
+        keepalive_expiry=0.0,
+        proxies=proxies,
+        using_tor_proxy=False,
+        local_addresses=net.local_addresses,
+        retries=net.retries,
+        retry_on_http_error=net.retry_on_http_error,
+        max_redirects=net.max_redirects,
+        logger_name=logger_name,
+    )
+
+
 def check_network_configuration():
     async def check():
         exception_count = 0
@@ -418,6 +484,26 @@ def initialize(
         image_proxy_params = default_params.copy()
         image_proxy_params['enable_http2'] = False
         NETWORKS['image_proxy'] = new_network(image_proxy_params, logger_name='image_proxy')
+
+    # Fallback proxy twins: for every network build a "<name>__proxy" sibling that
+    # routes through the fallback proxy.  An engine is switched to its twin only
+    # after it is blocked (captcha / HTTP 429) on the direct IP -- see the online
+    # processor (searx/search/processors/online.py).  Networks shared by several
+    # engines (references) share a single twin.
+    fallback_proxies = _get_fallback_proxies()
+    if fallback_proxies:
+        proxy_twins: dict[int, Network] = {}
+        for net_name, net in list(NETWORKS.items()):
+            if net_name.endswith('__proxy'):
+                continue
+            twin = proxy_twins.get(id(net))
+            if twin is None:
+                twin = _clone_network_with_proxies(net, fallback_proxies, f"{net_name}__proxy")
+                proxy_twins[id(net)] = twin
+            NETWORKS[f"{net_name}__proxy"] = twin
+        # logged at WARNING so it is visible at the production log level: a
+        # one-time, boot-time confirmation that the fallback proxy is armed.
+        logger.warning("fallback proxy enabled (%d networks have a proxy twin)", len(proxy_twins))
 
 
 @atexit.register

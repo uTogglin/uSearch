@@ -208,6 +208,15 @@ outgoing:
   #
   #  using_tor_proxy: true
   #
+  # Fallback proxy: used ONLY to re-query an engine after it is blocked
+  # (captcha / HTTP 429) on the direct IP. Normal traffic stays direct; the
+  # blocked engine sticks to the proxy for max_ban_time_on_fail seconds then
+  # re-probes the direct IP. Set a full URL/mapping here, or leave it unset and
+  # provide PROXY_HOST / PROXY_PORT / PROXY_USERNAME / PROXY_PASSWORD env vars
+  # (the latter is how the credentials are injected as Fly secrets).
+  #
+  #  fallback_proxies: http://user:pass@gw.dataimpulse.com:823
+  #
   # Extra seconds to add in order to account for the time taken by the proxy
   #
   #  extra_proxy_timeout: 10
