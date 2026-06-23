@@ -79,16 +79,28 @@ _TRAIL_PLATFORM = re.compile(
     re.IGNORECASE,
 )
 
+# A trailing generic "game"/"video game" is the qualifier people append to
+# disambiguate a title that also names a film or show ("sonic game", "the last
+# of us game").  It is not part of the real title, so strip it — trailing only,
+# so a title that genuinely contains the word ("Game Dev Tycoon", "This War of
+# Mine") keeps it.  Mirrors the frontend GAME_TRAIL_RE in serp_enhance.js.
+_TRAIL_GENERIC = re.compile(
+    r"\s+(?:the\s+)?(?:video\s*game|pc\s+game|videogame|game)\s*$",
+    re.IGNORECASE,
+)
+
 
 def _normalise_query(query: str) -> str:
-    """Strip shopping intent words (anywhere) and trailing platform words so the
-    title resolves cleanly and the cache key tightens ("hades steam key buy cheap
-    pc" -> "hades").  Falls back to the original query if the result is empty."""
+    """Strip shopping intent words (anywhere) plus trailing platform / generic
+    "game" qualifiers so the title resolves cleanly and the cache key tightens
+    ("sonic game" -> "sonic", "hades steam key buy cheap pc" -> "hades").  Falls
+    back to the original query if the result is empty."""
     cur = _INTENT.sub(" ", query)
     prev = None
-    while cur != prev:  # peel stacked trailing platforms ("... on steam pc")
+    while cur != prev:  # peel stacked trailing qualifiers ("... game on steam pc")
         prev = cur
         cur = _TRAIL_PLATFORM.sub("", cur).rstrip(" -:|·")
+        cur = _TRAIL_GENERIC.sub("", cur).rstrip(" -:|·")
     cur = re.sub(r"\s+", " ", cur).strip(" -:|·")
     return cur or query
 

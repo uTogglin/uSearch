@@ -27,6 +27,14 @@ class GameOffersNormaliseQuery(unittest.TestCase):
         self.assertEqual(go._normalise_query("hades pc"), "hades")
         self.assertEqual(go._normalise_query("elden ring on steam"), "elden ring")
 
+    def test_strips_trailing_generic_game(self):
+        # The disambiguating "game"/"video game" suffix ("sonic game" vs the
+        # film/show) is not part of the title, so it is peeled before searching.
+        self.assertEqual(go._normalise_query("sonic game"), "sonic")
+        self.assertEqual(go._normalise_query("the last of us game"), "the last of us")
+        self.assertEqual(go._normalise_query("elden ring video game"), "elden ring")
+        self.assertEqual(go._normalise_query("spider-man pc game"), "spider-man")
+
     def test_strips_stacked_qualifiers(self):
         self.assertEqual(go._normalise_query("hades steam key buy cheap pc"), "hades")
         self.assertEqual(go._normalise_query("cyberpunk 2077 cd key price"), "cyberpunk 2077")
