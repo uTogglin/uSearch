@@ -586,16 +586,23 @@
   const ENT_HOSTS = ["imdb.com", "iket.me", "themoviedb.org", "rottentomatoes.com",
     "metacritic.com", "justwatch.com", "thetvdb.com", "letterboxd.com"];
 
-  // An explicit film/TV qualifier in the query is also entertainment intent,
-  // even when the result set is dominated by a same-named game or product
-  // ("pokemon black and white series" -> the anime, not the Nintendo game). The
-  // watch box self-cancels when JustWatch has no offers, so a stray match here
-  // costs at most one cancelled fetch. Bare "series" only counts at the end of
-  // the query (the disambiguation pattern), so "time series analysis" is skipped.
-  const ENT_QUERY_RE = /\b(?:tv|web)\s+series\b|\bmini[-\s]?series\b|\b(?:tv|web)\s+show\b|\banime\b|\bseason\s*\d+\b|\bepisode\s*\d+\b|\bs\d{1,2}e\d{1,3}\b|\bseries\s*$/i;
+  // Explicit film/TV qualifiers in the query (independent of the result set, so
+  // they fire even when a same-named game or product dominates the results).
+  //
+  // WATCH_TRAIL_RE is the *trailing* qualifier people append to disambiguate a
+  // title that also names a game ("sonic movie", "the last of us series"). A
+  // trailing qualifier is decisive (see queryIntent) and the last word wins, so
+  // "the lego movie game" reads as a game while "untitled goose game movie"
+  // reads as a film. Bare "series"/"show" only count at the very end, so
+  // "time series analysis" is not treated as entertainment.
+  const WATCH_TRAIL_RE = /\b(?:tv\s+series|web\s+series|mini[-\s]?series|tv\s+show|web\s+show|series|show|movies?|films?|anime|cartoons?)\s*$/i;
 
-  function isEntertainmentPage() {
-    if (ENT_QUERY_RE.test(currentQuery())) return true;
+  // WATCH_ANY_RE matches qualifiers anywhere in the query: "movie"/"film" carry
+  // entertainment intent wherever they sit ("watch sonic movie online", "scary
+  // movie"), as do season/episode markers and the multi-word series/show forms.
+  const WATCH_ANY_RE = /\bmovies?\b|\bfilms?\b|\b(?:tv|web)\s+series\b|\bmini[-\s]?series\b|\b(?:tv|web)\s+show\b|\banime\b|\bseason\s*\d+\b|\bepisode\s*\d+\b|\bs\d{1,2}e\d{1,3}\b/i;
+
+  function hasEntHost() {
     let found = false;
     document.querySelectorAll(".result").forEach((r) => {
       if (found) return;
@@ -710,12 +717,20 @@
     "gamefaqs.gamespot.com", "howlongtobeat.com", "isthereanydeal.com",
     "gg.deals", "opencritic.com", "protondb.com"];
 
-  // An explicit "buy/price/cheapest … pc/steam" or "steam/cd key" phrasing is
-  // also game-shopping intent even when the result set is generic.
-  const GAME_QUERY_RE = /\bcd\s*keys?\b|\b(?:steam|gog|epic|game)\s+keys?\b|\bpc\s+game\b|\b(?:buy|price|prices|cheapest|deal|deals)\b[\s\S]*\b(?:pc|steam|game)\b|\b(?:pc|steam|game)\b[\s\S]*\b(?:buy|price|prices|cheapest|deal|deals)\b/i;
+  // A trailing "game"/"video game" is how people disambiguate a title that also
+  // names a film or show ("sonic game", "the last of us game"). It is decisive
+  // (see queryIntent) and, being the last word, beats an earlier film/TV
+  // qualifier. NOTE: bare trailing "game" is inherently ambiguous — "squid game"
+  // and "game of thrones" name shows, not games — but the user typed the word,
+  // so we honour it: the box self-cancels if no PC game matches, and appending
+  // "show"/"series"/"movie" flips the query back to the watch box.
+  const GAME_TRAIL_RE = /\b(?:video\s*game|pc\s+game|videogame|game)\s*$/i;
 
-  function isGamePage() {
-    if (GAME_QUERY_RE.test(currentQuery())) return true;
+  // Explicit shopping phrasing ("buy/price/cheapest … pc/steam", "steam/cd key")
+  // is game intent anywhere in the query, even with a generic result set.
+  const GAME_ANY_RE = /\bcd\s*keys?\b|\b(?:steam|gog|epic|game)\s+keys?\b|\bpc\s+game\b|\b(?:buy|price|prices|cheapest|deal|deals)\b[\s\S]*\b(?:pc|steam|game)\b|\b(?:pc|steam|game)\b[\s\S]*\b(?:buy|price|prices|cheapest|deal|deals)\b/i;
+
+  function hasGameHost() {
     let found = false;
     document.querySelectorAll(".result").forEach((r) => {
       if (found) return;
@@ -723,6 +738,22 @@
       if (h && GAME_HOSTS.some((e) => h === e || h.endsWith("." + e))) found = true;
     });
     return found;
+  }
+
+  // Decide film/TV vs game from the query's explicit qualifiers, so the user's
+  // words override whatever the result hosts suggest. A *trailing* qualifier
+  // ("sonic game" vs "sonic movie") is the strongest signal and the last word
+  // wins; absent that, a qualifier anywhere decides. Returns "game" | "watch" |
+  // null — null falls back to result-host detection, which may legitimately
+  // light up BOTH boxes for a franchise with both a game and a show.
+  function queryIntent() {
+    const q = currentQuery();
+    if (!q) return null;
+    if (GAME_TRAIL_RE.test(q)) return "game";
+    if (WATCH_TRAIL_RE.test(q)) return "watch";
+    if (GAME_ANY_RE.test(q)) return "game";
+    if (WATCH_ANY_RE.test(q)) return "watch";
+    return null;
   }
 
   function gameRow(o, newTab) {
@@ -1060,8 +1091,13 @@
 
     const newTab = !!document.querySelector(
       '.result h3 a[target="_blank"], .result a.url_header[target="_blank"]');
-    const wantWatch = isEntertainmentPage();
-    const wantGame = isGamePage();
+    // An explicit query qualifier wins and is exclusive ("sonic game" shows only
+    // the game box, "sonic movie" only the watch box, even if the other type's
+    // hosts appear in the results). With no qualifier, fall back to result-host
+    // detection, which may light up both boxes for a dual game/show franchise.
+    const intent = queryIntent();
+    const wantWatch = intent ? intent === "watch" : hasEntHost();
+    const wantGame = intent ? intent === "game" : hasGameHost();
 
     let wrap = document.getElementById("serp-sources");
     if (!wrap) {
