@@ -2018,6 +2018,30 @@ engines:
     shortcut: prt
     categories: [3d print]
 
+  # "Good sites" with no usable search API -> inject the query straight into
+  # their own search page (see searx/engines/injected_link.py). Printables stays
+  # an API engine above; these are direct one-click links.
+  - name: makerworld
+    engine: injected_link
+    shortcut: mkw
+    categories: [3d print]
+    site_name: MakerWorld
+    search_url: https://makerworld.com/en/search/models?keyword={query}
+
+  - name: thingiverse
+    engine: injected_link
+    shortcut: thgv
+    categories: [3d print]
+    site_name: Thingiverse
+    search_url: https://www.thingiverse.com/search?q={query}&type=things
+
+  - name: cults3d
+    engine: injected_link
+    shortcut: cults
+    categories: [3d print]
+    site_name: Cults3D
+    search_url: https://cults3d.com/en/search?q={query}
+
   - name: piped
     engine: piped
     shortcut: ppd

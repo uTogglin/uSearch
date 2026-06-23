@@ -52,6 +52,9 @@ use_default_settings:
       - wiktionary
       # 3d print
       - printables
+      - makerworld
+      - thingiverse
+      - cults3d
 
 # Per-engine overrides. hackernews ships `disabled: true` in the defaults, so
 # keep_only alone would include it but leave it inactive — flip it on here.
