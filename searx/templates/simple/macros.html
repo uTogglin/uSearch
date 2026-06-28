@@ -56,6 +56,9 @@
 <div class="engines">
   {% for engine in result.engines %}<span>{{ engine }}</span>{% endfor %}
   {{ icon_small('ellipsis-vertical') + result_link(cache_url + result.url, _('cached'), "cache_link") }}
+  {%- set site_host = result.parsed_url.hostname or result.parsed_url.netloc -%}
+  {%- if site_host and site_host.startswith('www.') %}{% set site_host = site_host[4:] %}{% endif -%}
+  {%- if site_host %}{{ icon_small('search') + result_link(url_for('search') ~ '?q=' ~ (((q ~ ' ') if q else '') ~ 'site:' ~ site_host)|urlencode, _('More results from this site'), "site_search_link") }}{% endif -%}
 </div>{{- '' -}}
 <div class="break"></div>{{- '' -}}
 {%- endmacro -%}
