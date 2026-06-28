@@ -59,7 +59,7 @@ class Search:
     def search_external_bang(self) -> bool:
         """Check if there is a external bang.  If yes, update
         self.result_container and return True."""
-        if self.search_query.external_bang:
+        if self.search_query.external_bang or self.search_query.featured_bang:
             self.result_container.redirect_url = get_bang_url(self.search_query)
 
             # This means there was a valid bang and the rest of the search does

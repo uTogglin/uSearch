@@ -1,14 +1,4 @@
 {
-  "_Bb45jgsT.min.js": {
-    "file": "chunk/Bb45jgsT.min.js",
-    "name": "app",
-    "imports": [
-      "_QTnfLwEv.min.js",
-      "src/js/index.ts",
-      "src/js/main/results.ts",
-      "_Dkpzt0vH.min.js"
-    ]
-  },
   "_Dkpzt0vH.min.js": {
     "file": "chunk/Dkpzt0vH.min.js",
     "name": "util",
@@ -20,6 +10,16 @@
     "file": "chunk/QTnfLwEv.min.js",
     "name": "rolldown-runtime"
   },
+  "_s25nwV0G.min.js": {
+    "file": "chunk/s25nwV0G.min.js",
+    "name": "app",
+    "imports": [
+      "_QTnfLwEv.min.js",
+      "src/js/index.ts",
+      "src/js/main/results.ts",
+      "_Dkpzt0vH.min.js"
+    ]
+  },
   "src/js/index.ts": {
     "file": "sxng-core.min.js",
     "name": "core",
@@ -27,7 +27,7 @@
     "isEntry": true,
     "dynamicImports": [
       "src/js/plugin/MapView.ts",
-      "_Bb45jgsT.min.js",
+      "_s25nwV0G.min.js",
       "src/js/plugin/Calculator.ts",
       "src/js/main/preferences.ts"
     ]
@@ -43,12 +43,12 @@
     ]
   },
   "src/js/main/results.ts": {
-    "file": "chunk/CsZCF9_5.min.js",
+    "file": "chunk/BWDHiMQB.min.js",
     "name": "results",
     "src": "src/js/main/results.ts",
     "isDynamicEntry": true,
     "imports": [
-      "_Bb45jgsT.min.js"
+      "_s25nwV0G.min.js"
     ]
   },
   "src/js/plugin/Calculator.ts": {

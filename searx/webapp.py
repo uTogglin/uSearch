@@ -115,6 +115,7 @@ from searx.locales import (
 
 # renaming names from searx imports ...
 from searx.autocomplete import search_autocomplete, backends as autocomplete_backends
+from searx.featured_bangs import featured_bang_suggestions
 from searx import favicons
 
 from searx.valkeydb import initialize as valkey_initialize
@@ -757,7 +758,7 @@ def search():
     result_container = None
     try:
         search_query, raw_text_query, _, _, selected_locale = get_search_query_from_webapp(
-            sxng_request.preferences, form
+            sxng_request.preferences, form, sxng_request.cookies.get('featured_bang_mode')
         )
         search_obj = searx.search.SearchWithPlugins(search_query, sxng_request, sxng_request.user_plugins)
         result_container = search_obj.search()
@@ -952,12 +953,58 @@ def info(pagename, locale):
     )
 
 
-def _run_autocompleter(query: str, xhr: bool):
+def _featured_bang_menu(query: str, xhr: bool):
+    """Kagi-style featured-bang menu, or ``None`` when not composing a bang.
+
+    Fires only while the token under the cursor is a single ``!`` bang (not a
+    ``!!`` external bang and not the trailing query after one). Returns the
+    OpenSearch-shaped ``[token, completions, names, icons]`` — names go in the
+    descriptions slot, inline favicon data URLs in the URLs slot — which the
+    in-page autocomplete renders as icon + name + shortcut rows.
+    """
+    head, _sep, tail = query.rpartition(' ')
+    if not tail.startswith('!') or tail.startswith('!!'):
+        return None
+
+    matches = featured_bang_suggestions(tail[1:])
+    if not matches:
+        return None
+
+    head_part = (head + ' ') if head else ''
+    completions = [head_part + '!' + b.shortcut for b in matches]
+    names = [b.name for b in matches]
+
+    icon_map = favicons.favicon_data_url_batch([b.domain for b in matches], len(matches))
+    icons = []
+    for b in matches:
+        icon = icon_map.get(b.domain, '') or ''
+        # The payload is HTML-escaped below (html.escape mangles '&', '<', '>').
+        # base64 data URLs are safe; blank anything else (e.g. a raw-SVG
+        # placeholder) and let the client fall back to a letter avatar.
+        if '&' in icon or '<' in icon or '>' in icon:
+            icon = ''
+        icons.append(icon)
+
+    suggestions = json.dumps([tail, completions, names, icons])
+    mimetype = 'application/json' if xhr else 'application/x-suggestions+json'
+    return escape(suggestions, False), mimetype
+
+
+def _run_autocompleter(query: str, xhr: bool, rich: bool = False):
     """Compute autocompletion suggestions for ``query``.
 
     Returns ``(suggestions_json, mimetype)``. Shared by the plaintext
     ``/autocompleter`` route and the encrypted ``/eautocompleter`` route.
+
+    ``rich`` is set only for in-page requests (our own JS), which can render the
+    icon-rich featured-bang menu; browser URL-bar OpenSearch requests leave it
+    off and fall through to plain-string suggestions.
     """
+    if rich:
+        menu = _featured_bang_menu(query, xhr)
+        if menu is not None:
+            return menu
+
     results = []
 
     # set blocked engines
@@ -1004,9 +1051,11 @@ def _run_autocompleter(query: str, xhr: bool):
 @app.route('/autocompleter', methods=['GET', 'POST'])
 def autocompleter():
     """Return autocompleter results"""
+    xhr = sxng_request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     suggestions, mimetype = _run_autocompleter(
         sxng_request.form.get('q', ''),
-        sxng_request.headers.get('X-Requested-With') == 'XMLHttpRequest',
+        xhr,
+        rich=xhr,  # the rich bang menu is for in-page xhr, not browser URL-bar OpenSearch
     )
     return Response(suggestions, mimetype=mimetype)
 
@@ -1032,7 +1081,7 @@ def eautocompleter():
     except (ValueError, AttributeError):
         flask.abort(400)
 
-    suggestions, _ = _run_autocompleter(query, xhr=False)
+    suggestions, _ = _run_autocompleter(query, xhr=False, rich=True)
     return _no_store(jsonify(session.encrypt(suggestions)))
 
 

@@ -45,6 +45,124 @@
       &.locked {
         cursor: inherit;
       }
+
+      // Mode toggle pinned atop the bang menu: "Redirect to site" / "Search in uSearch".
+      &.bang-mode-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding-top: 0.6rem;
+        padding-bottom: 0.6rem;
+        border-bottom: 1px solid var(--color-autocomplete-background-hover);
+        font-size: 0.85em;
+      }
+
+      .bang-mode-toggle__label {
+        opacity: 0.7;
+      }
+
+      .bang-mode-toggle__switch {
+        flex: 0 0 auto;
+        padding: 0.15rem 0.6rem;
+        border-radius: 1rem;
+        font-weight: 600;
+        color: var(--color-base-background);
+        background-color: var(--color-autocomplete-font);
+
+        &.is-usearch {
+          background-color: var(--color-url-font);
+        }
+      }
+
+      // Kagi-style featured-bang row: favicon left, name stacked over its
+      // !shortcut handle. Laid out as a 2-row grid so the icon spans both lines.
+      &.bang-suggestion {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        align-items: center;
+        column-gap: 0.6rem;
+        padding: 0.4rem 0.6rem;
+        border-radius: 0.5rem;
+      }
+
+      .bang-suggestion__icon {
+        grid-row: 1 / span 2;
+        flex: 0 0 auto;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 0.35rem;
+        object-fit: contain;
+      }
+
+      .bang-suggestion__icon--letter {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--color-autocomplete-font);
+        background-color: var(--color-autocomplete-background-hover);
+      }
+
+      .bang-suggestion__name {
+        grid-column: 2;
+        grid-row: 1;
+        font-weight: 600;
+        line-height: 1.25;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .bang-suggestion__shortcut {
+        grid-column: 2;
+        grid-row: 2;
+        opacity: 0.55;
+        font-size: 0.85em;
+        line-height: 1.2;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-variant-numeric: tabular-nums;
+      }
+
+      // Footer link ("Learn more about bangs"), spanning the full grid width.
+      &.bang-menu-footer {
+        padding: 0.55rem 0.75rem 0.4rem;
+
+        &.active,
+        &:active,
+        &:focus,
+        &:hover {
+          background-color: transparent;
+        }
+
+        a {
+          color: var(--color-url-font);
+          font-size: 0.85em;
+          text-decoration: none;
+
+          &:hover {
+            text-decoration: underline;
+          }
+        }
+      }
+    }
+
+    // Two-column grid only for the featured-bang menu; plain suggestions and the
+    // "no results" message keep the single-column list flow.
+    &.bang-menu {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.1rem 0.4rem;
+      padding: 0.4rem;
+
+      > li.bang-mode-toggle,
+      > li.bang-menu-footer {
+        grid-column: 1 / -1;
+      }
     }
   }
 
@@ -68,6 +186,16 @@
   .autocomplete {
     > ul > li {
       padding: 1rem;
+    }
+
+    // The bang menu stays a single column on phones; its rows keep the tighter
+    // grid padding rather than the roomy plain-suggestion padding above.
+    > ul.bang-menu {
+      grid-template-columns: 1fr;
+
+      > li.bang-suggestion {
+        padding: 0.5rem 0.75rem;
+      }
     }
   }
 }

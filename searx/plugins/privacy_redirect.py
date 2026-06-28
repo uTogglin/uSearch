@@ -183,6 +183,21 @@ def _clean(url: str, cfg: dict[str, str]) -> str:
     return url
 
 
+def to_frontend(url: str) -> str:
+    """Rewrite ``url`` to its configured privacy frontend, or return it unchanged.
+
+    Standalone entry point (no plugin instance needed) so other parts of the app
+    can route a URL through the *same* host-swap the result-link rewrite uses —
+    e.g. the featured-bang "Redirect to site" mode, which should land on
+    ``redlib`` rather than ``reddit.com`` when Reddit has a privacy frontend
+    configured. Uses the merged settings instances (defaults + ``settings.yml``).
+    """
+    if not url or not url.startswith(("http://", "https://")):
+        return url
+    instances = {**_DEFAULTS, **(get_setting("privacy_redirect", {}) or {})}
+    return _clean(url, instances)
+
+
 @t.final
 class SXNGPlugin(Plugin):
     """Redirect result links to privacy-respecting frontends (except YouTube)."""

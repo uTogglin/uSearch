@@ -7,6 +7,7 @@ import typing as t
 
 from urllib.parse import quote_plus, urlparse
 from searx.data import EXTERNAL_BANGS
+from searx.featured_bangs import resolve_featured_bang
 
 LEAF_KEY = chr(16)
 
@@ -100,6 +101,20 @@ def get_bang_url(search_query: "SearchQuery", external_bangs_db: dict[str, t.Any
 
     if external_bangs_db is None:
         external_bangs_db = EXTERNAL_BANGS
+
+    # curated featured bang (single '!') — resolved from its own namespace, never
+    # the DDG '!!' database, so the two cannot shadow each other
+    featured_bang = getattr(search_query, "featured_bang", None)
+    if featured_bang:
+        featured = resolve_featured_bang(featured_bang, search_query.query)
+        if featured is not None:
+            # "Redirect to site" should follow the site's privacy frontend when one
+            # is configured (e.g. reddit.com/search -> redlib/search), matching the
+            # rewrite applied to ordinary result links. Imported lazily to avoid a
+            # module-import cycle through the plugins package.
+            from searx.plugins.privacy_redirect import to_frontend  # pylint: disable=import-outside-toplevel
+
+            return to_frontend(featured)
 
     if search_query.external_bang:
         bang_definition, _ = get_bang_definition_and_ac(external_bangs_db, search_query.external_bang)

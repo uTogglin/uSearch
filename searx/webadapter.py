@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple
 from searx.exceptions import SearxParameterException
 from searx.webutils import VALID_LANGUAGE_CODE
 from searx.query import RawTextQuery
+from searx.featured_bangs import featured_bang_domain
 from searx.engines import categories, engines
 from searx.search.models import SearchQuery, EngineRef
 from searx.preferences import Preferences
@@ -219,7 +220,7 @@ def parse_engine_data(form):
 
 
 def get_search_query_from_webapp(
-    preferences: Preferences, form: Dict[str, str]
+    preferences: Preferences, form: Dict[str, str], featured_bang_mode: Optional[str] = None
 ) -> Tuple[SearchQuery, RawTextQuery, List[EngineRef], List[EngineRef], str]:
     """Assemble data from preferences and request.form (from the HTML form) needed
     in a search query.
@@ -250,6 +251,17 @@ def get_search_query_from_webapp(
     # the search engine or search-language
     raw_text_query = RawTextQuery(form['q'], disabled_engines)
 
+    # "Search in uSearch" mode: instead of redirecting a featured bang to the
+    # site, re-run it as a site-scoped search — exactly what the result footer's
+    # "More results from this site" link does (append ``site:host``). Re-parsing
+    # the rewritten query recomputes engines/specificity cleanly with no bang.
+    if featured_bang_mode == 'usearch' and raw_text_query.featured_bang:
+        domain = featured_bang_domain(raw_text_query.featured_bang)
+        if domain:
+            base = raw_text_query.getQuery()
+            rewritten = (base + ' ' if base else '') + 'site:' + domain
+            raw_text_query = RawTextQuery(rewritten, disabled_engines)
+
     # set query
     query = raw_text_query.getQuery()
     query_pageno = parse_pageno(form)
@@ -257,6 +269,7 @@ def get_search_query_from_webapp(
     query_time_range = parse_time_range(form)
     query_timeout = parse_timeout(form, raw_text_query)
     external_bang = raw_text_query.external_bang
+    featured_bang = raw_text_query.featured_bang
     redirect_to_first_result = raw_text_query.redirect_to_first_result
     engine_data = parse_engine_data(form)
 
@@ -292,6 +305,7 @@ def get_search_query_from_webapp(
             external_bang=external_bang,
             engine_data=engine_data,
             redirect_to_first_result=redirect_to_first_result,
+            featured_bang=featured_bang,
         ),
         raw_text_query,
         query_engineref_list_unknown,

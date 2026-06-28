@@ -8,6 +8,7 @@ from searx import settings
 from searx.sxng_locales import sxng_locales
 from searx.engines import categories, engines, engine_shortcuts
 from searx.external_bang import get_bang_definition_and_autocomplete
+from searx.featured_bangs import is_featured_bang
 from searx.search.models import EngineRef
 from searx.webutils import VALID_LANGUAGE_CODE
 
@@ -191,6 +192,18 @@ class BangParser(QueryPartParser):
         return found
 
     def _parse(self, value):
+        # Curated featured bang (e.g. a UK site-search redirect, or the Reddit
+        # menu entry): stored in its own field so it resolves via get_bang_url
+        # without colliding with the DDG '!!' database. Checked *first*, before
+        # the engine lookup, so a curated shortcut (``!reddit``) always gets its
+        # featured behaviour — redirect to the site / privacy frontend, or a
+        # ``site:`` scoped uSearch search — and never falls through to a
+        # like-named engine (the ``reddit`` engine is disabled/blocked anyway).
+        # Engines stay reachable through their own non-colliding shortcut (``!re``).
+        if is_featured_bang(value):
+            self.raw_text_query.featured_bang = value
+            return True
+
         # check if prefix is equal with engine shortcut
         if value in engine_shortcuts:  # pylint: disable=consider-using-get
             value = engine_shortcuts[value]
@@ -268,6 +281,7 @@ class RawTextQuery:
         self.languages = []
         self.timeout_limit = None
         self.external_bang = None
+        self.featured_bang = None
         self.specific = False
         self.autocomplete_list = []
         # internal properties
@@ -340,6 +354,7 @@ class RawTextQuery:
             + f"languages={self.languages!r} "
             + f"timeout_limit={self.timeout_limit!r} "
             + f"external_bang={self.external_bang!r} "
+            + f"featured_bang={self.featured_bang!r} "
             + f"specific={self.specific!r} "
             + f"enginerefs={self.enginerefs!r}\n  "
             + f"autocomplete_list={self.autocomplete_list!r}\n  "
