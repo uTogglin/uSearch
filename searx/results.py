@@ -12,6 +12,7 @@ from flask_babel import gettext
 
 from searx import logger as log
 from searx import popularity
+from searx import site_priority
 from searx import intent_boost
 import searx.engines
 from searx.metrics import histogram_observe, counter_add
@@ -48,6 +49,10 @@ def calculate_score(
         parsed_url = getattr(result, 'parsed_url', None)
         if parsed_url is not None:
             score *= popularity.boost(parsed_url.netloc)
+            # uSearch: apply any admin-set *global* per-site override (block /
+            # lower / raise / pin) from the runtime store. Layered last so it has
+            # the final say over the organic + popularity score.
+            score = site_priority.adjust(score, parsed_url.netloc)
 
     return score
 

@@ -73,6 +73,17 @@ def _registrable_rank(netloc: str) -> "int | None":
     return None
 
 
+def rank(netloc: str) -> "int | None":
+    """Public: best Tranco rank for a hostname (``#N by traffic``), or None.
+
+    Used by the SERP "shield" panel to show a site's popularity; mirrors the
+    subdomain-walk that :py:func:`boost` relies on.
+    """
+    if not netloc:
+        return None
+    return _registrable_rank(netloc)
+
+
 def boost(netloc: str) -> float:
     """Multiplicative score boost in ``[1.0, 1.0 + BOOST_STRENGTH]``.
 

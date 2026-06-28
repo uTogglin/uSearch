@@ -341,6 +341,22 @@ card_meta:
   # Optional: a GitHub token (or the GITHUB_TOKEN env var) raises the anonymous
   # 60/hr limit to 5000/hr. Leave empty to stay fully anonymous and free.
   github_token: ""
+  # The result "shield" panel (GET /site_info) shows per-site info — connection,
+  # popularity (Tranco rank), and domain registration date / owner (free RDAP
+  # lookup via rdap.org, cached with the settings above). No extra config needed.
+  #
+  # Admin-gated GLOBAL ranking overrides (POST /site_priority): set this token
+  # (or the USEARCH_ADMIN_TOKEN env var) to let an admin push a block/lower/
+  # raise/pin adjustment that applies to EVERY user's results. Leave empty to
+  # disable the global control entirely (visitors keep their own per-browser
+  # adjustments either way). Overrides are stored at site_priority.path below.
+  admin_token: ""
+
+# Runtime store for admin-set global per-site ranking overrides. Read live on
+# every search (no redeploy needed) and persisted on the Fly volume so it
+# survives deploys; falls back to the temp dir if the path isn't writable.
+site_priority:
+  path: "/var/cache/searxng/site_priorities.json"
 
 
 # Configuration of the "Watch Offers plugin" ("Where to watch" box):
