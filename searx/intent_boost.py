@@ -15,6 +15,12 @@ Intent is detected from the *results themselves* (language-independent): if the
 result set contains a recognised film/TV reference (IMDb, TMDB, Rotten Tomatoes,
 JustWatch, ...) the query is treated as entertainment.  No query parsing, no NLP.
 
+The reference must be a *title page* (``imdb.com/title/tt…``, ``letterboxd.com/
+film/…``, ``themoviedb.org/movie/…``, …), not merely the domain: a real film/TV
+query always surfaces a title page, whereas a generic query ("why are search
+results so bad") only ever picks up a stray article/list/news page on one of
+these sites -- which used to be enough to wrongly inject a "where to watch" box.
+
 These lists are deliberately readable -- extend them as needed.
 """
 
@@ -62,16 +68,20 @@ def _rx(*pats: str) -> list[re.Pattern]:
     return [re.compile(p) for p in pats]
 
 
-# Presence of ANY of these in the result set => entertainment (film/TV) query.
+# A *title page* on any of these => entertainment (film/TV) query.  Matched
+# against a lowercased ``netloc + path`` string, so the path qualifier is what
+# separates a genuine title page from a stray article/list/news page on the same
+# host.  ``justwatch.com`` needs no path: any JustWatch result is by definition
+# about where to watch something.
 ENTERTAINMENT_REF = _rx(
-    r'(^|\.)imdb\.com$',
-    r'(^|\.)iket\.me$',  # libremdb (IMDb privacy frontend)
-    r'(^|\.)themoviedb\.org$',
-    r'(^|\.)rottentomatoes\.com$',
-    r'(^|\.)metacritic\.com$',
-    r'(^|\.)justwatch\.com$',
-    r'(^|\.)thetvdb\.com$',
-    r'(^|\.)letterboxd\.com$',
+    r'(^|\.)imdb\.com/(?:[a-z]{2}/)?title/tt\d+',
+    r'(^|\.)iket\.me/title/tt\d+',  # libremdb (IMDb privacy frontend)
+    r'(^|\.)themoviedb\.org/(?:movie|tv)/\d+',
+    r'(^|\.)rottentomatoes\.com/(?:m|tv)/[^/]+',
+    r'(^|\.)metacritic\.com/(?:movie|tv|tv-show)/[^/]+',
+    r'(^|\.)justwatch\.com/',
+    r'(^|\.)thetvdb\.com/(?:series|movies)/[^/]+',
+    r'(^|\.)letterboxd\.com/film/[^/]+',
 )
 
 # "Where to watch" -> boosted on entertainment intent.  Pure streaming /
@@ -115,9 +125,13 @@ def _match(rxs: list[re.Pattern], netloc: str) -> bool:
     return any(rx.search(netloc) for rx in rxs)
 
 
-def is_entertainment(hostnames: "set[str]") -> bool:
-    """True if the result set looks like a film/TV query."""
-    return any(_match(ENTERTAINMENT_REF, h) for h in hostnames)
+def is_entertainment(urls: "set[str]") -> bool:
+    """True if the result set looks like a film/TV query.
+
+    ``urls`` is an iterable of lowercased ``netloc + path`` strings (e.g.
+    ``"www.imdb.com/title/tt0133093/"``).  A bare domain no longer qualifies --
+    the match must reach a title page (see :data:`ENTERTAINMENT_REF`)."""
+    return any(_match(ENTERTAINMENT_REF, u) for u in urls)
 
 
 def multiplier(netloc: str) -> float:

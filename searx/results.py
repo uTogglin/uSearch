@@ -217,13 +217,13 @@ class ResultContainer:
         :py:mod:`searx.intent_boost`)."""
         results = list(self.main_results_map.values())
 
-        hostnames: set[str] = set()
+        urls: set[str] = set()
         for result in results:
             parsed_url = getattr(result, 'parsed_url', None)
             if parsed_url is not None and parsed_url.netloc:
-                hostnames.add(parsed_url.netloc.lower())
+                urls.add((parsed_url.netloc + parsed_url.path).lower())
 
-        if not intent_boost.is_entertainment(hostnames):
+        if not intent_boost.is_entertainment(urls):
             return
 
         for result in results:
@@ -241,15 +241,15 @@ class ResultContainer:
         queries we synthesise an answer-box link to JustWatch's search for the
         title (region derived from the search locale).  Skipped if the engines
         already surfaced a JustWatch result."""
-        hostnames: set[str] = set()
+        urls: set[str] = set()
         for result in self.main_results_map.values():
             parsed_url = getattr(result, 'parsed_url', None)
             if parsed_url is not None and parsed_url.netloc:
-                hostnames.add(parsed_url.netloc.lower())
+                urls.add((parsed_url.netloc + parsed_url.path).lower())
 
-        if not intent_boost.is_entertainment(hostnames):
+        if not intent_boost.is_entertainment(urls):
             return
-        if any('justwatch.com' in h for h in hostnames):
+        if any('justwatch.com' in u for u in urls):
             return
 
         query = (getattr(search_query, 'query', '') or '').strip()
