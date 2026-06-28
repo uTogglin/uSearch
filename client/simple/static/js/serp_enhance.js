@@ -282,6 +282,254 @@
     .theme-dark .serp-fx-input, .theme-dark .serp-fx-select {
       color:#e8e8e8; background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.18);
     }
+
+    /* ── Site "shield" — per-result priority + info panel ─────────────────── */
+    .serp-shield-btn {
+      display:inline-flex; align-items:center; justify-content:center;
+      vertical-align:middle; margin-left:8px; position:relative; top:-1px;
+      background:transparent; border:1px solid rgba(127,127,127,0.28);
+      border-radius:6px; color:var(--color-base-font,#666);
+      width:22px; height:20px; padding:0; cursor:pointer; opacity:0.5;
+      transition:opacity .15s,background .15s,border-color .15s,color .15s;
+    }
+    .result:hover .serp-shield-btn { opacity:0.9; }
+    .serp-shield-btn:hover { opacity:1; background:rgba(66,133,244,0.10); border-color:rgba(66,133,244,0.45); color:#4285f4; }
+    .serp-shield-btn svg { width:13px; height:13px; }
+    /* The shield reflects the current per-site priority at a glance. */
+    .serp-shield-btn.lvl-block  { color:#c0392b; border-color:rgba(192,57,43,0.5);  opacity:0.95; }
+    .serp-shield-btn.lvl-lower  { color:#9a6700; border-color:rgba(154,103,0,0.45); opacity:0.9; }
+    .serp-shield-btn.lvl-raise  { color:#1a7f37; border-color:rgba(26,127,55,0.45); opacity:0.9; }
+    .serp-shield-btn.lvl-pin    { color:#1f6feb; border-color:rgba(31,111,235,0.5); opacity:0.95; }
+
+    /* A blocked result is collapsed to a thin "unblock" stub (not removed, so
+       the user can always reverse it). */
+    .result.serp-blocked > *:not(.serp-blocked-note) { display:none !important; }
+    .result.serp-blocked {
+      opacity:1; padding:6px 0 !important; margin:0 !important; border:none !important; box-shadow:none !important;
+    }
+    .serp-blocked-note {
+      display:flex; align-items:center; gap:8px; font-size:0.78rem; color:#8a8a8a;
+    }
+    .serp-blocked-note button {
+      background:transparent; border:1px solid rgba(127,127,127,0.3); border-radius:6px;
+      color:inherit; font:inherit; font-size:0.74rem; padding:2px 8px; cursor:pointer;
+    }
+    .serp-blocked-note button:hover { color:#4285f4; border-color:rgba(66,133,244,0.45); }
+    .result.serp-lowered { opacity:0.62; }
+
+    /* Modal */
+    .serp-modal-backdrop {
+      position:fixed; inset:0; background:rgba(0,0,0,0.5);
+      display:flex; align-items:flex-start; justify-content:center;
+      padding:6vh 16px 16px; z-index:9999; overflow:auto;
+      animation:serp-fade .12s ease;
+    }
+    @keyframes serp-fade { from { opacity:0; } to { opacity:1; } }
+    .serp-modal {
+      width:100%; max-width:420px; border-radius:16px; overflow:hidden;
+      background:var(--color-base-background,#fff);
+      border:1px solid rgba(127,127,127,0.22);
+      box-shadow:0 18px 48px rgba(0,0,0,0.32); color:var(--color-base-font,#202124);
+    }
+    .serp-modal-head {
+      display:flex; align-items:flex-start; gap:10px; padding:16px 16px 14px;
+      background:rgba(127,127,127,0.06); border-bottom:1px solid rgba(127,127,127,0.14);
+    }
+    .serp-modal-fav { width:22px; height:22px; border-radius:5px; flex-shrink:0; margin-top:2px; object-fit:contain; background:rgba(127,127,127,0.12); }
+    .serp-modal-titles { flex:1 1 auto; min-width:0; }
+    .serp-modal-title { font-size:0.96rem; font-weight:600; line-height:1.3; margin:0; word-break:break-word; }
+    .serp-modal-host { font-size:0.8rem; color:#8a8a8a; margin-top:2px; word-break:break-all; }
+    .serp-modal-close {
+      flex-shrink:0; background:transparent; border:none; cursor:pointer;
+      color:var(--color-base-font,#555); width:28px; height:28px; border-radius:8px;
+      display:inline-flex; align-items:center; justify-content:center;
+    }
+    .serp-modal-close:hover { background:rgba(127,127,127,0.14); }
+    .serp-modal-close svg { width:16px; height:16px; }
+    .serp-modal-body { padding:14px 16px 18px; }
+
+    .serp-rank-label {
+      display:flex; align-items:center; gap:6px; font-size:0.88rem; font-weight:600; margin:0 0 9px;
+    }
+    .serp-rank-label .serp-rank-info {
+      width:15px; height:15px; color:#9aa0a6; cursor:help; flex-shrink:0;
+    }
+    .serp-seg {
+      display:grid; grid-template-columns:repeat(5,1fr); gap:0;
+      border:1px solid rgba(127,127,127,0.28); border-radius:9px; overflow:hidden;
+    }
+    .serp-seg button {
+      background:rgba(127,127,127,0.06); border:none; border-left:1px solid rgba(127,127,127,0.18);
+      color:var(--color-base-font,#444); font:inherit; font-size:0.8rem; font-weight:600;
+      padding:9px 4px; cursor:pointer; transition:background .12s,color .12s;
+    }
+    .serp-seg button:first-child { border-left:none; }
+    .serp-seg button:hover { background:rgba(127,127,127,0.14); }
+    .serp-seg button.active { background:#202124; color:#fff; }
+    .theme-dark .serp-seg button.active { background:#e8e8e8; color:#202124; }
+    .serp-seg button.active.act-block { background:#c0392b; color:#fff; }
+    .serp-seg button.active.act-lower { background:#9a6700; color:#fff; }
+    .serp-seg button.active.act-raise { background:#1a7f37; color:#fff; }
+    .serp-seg button.active.act-pin   { background:#1f6feb; color:#fff; }
+
+    .serp-global {
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+      margin:11px 0 2px; font-size:0.78rem; color:#8a8a8a;
+    }
+    .serp-global b { color:var(--color-base-font,#444); font-weight:600; }
+    .serp-global-btn {
+      margin-left:auto; background:transparent; border:1px solid rgba(31,111,235,0.45);
+      color:#1f6feb; border-radius:7px; font:inherit; font-size:0.76rem; font-weight:600;
+      padding:5px 10px; cursor:pointer;
+    }
+    .serp-global-btn:hover { background:rgba(31,111,235,0.10); }
+    .serp-global-btn:disabled { opacity:0.5; cursor:default; }
+    .serp-global-msg { width:100%; font-size:0.74rem; }
+    .serp-global-msg.ok { color:#1a7f37; }
+    .serp-global-msg.err { color:#c0392b; }
+
+    .serp-info { list-style:none; margin:16px 0 0; padding:14px 0 0; border-top:1px solid rgba(127,127,127,0.14); }
+    .serp-info li { display:flex; align-items:flex-start; gap:12px; padding:8px 0; }
+    .serp-info .serp-info-ic { width:20px; height:20px; color:#9aa0a6; flex-shrink:0; margin-top:1px; }
+    .serp-info .serp-info-ic svg { width:20px; height:20px; }
+    .serp-info-k { font-size:0.86rem; color:#8a8a8a; flex:1 1 auto; }
+    .serp-info-v { font-size:0.86rem; font-weight:600; text-align:right; word-break:break-word; max-width:60%; }
+    .serp-info-v.muted { font-weight:400; color:#9aa0a6; }
+    .serp-info-v .ok { color:#1a7f37; }
+    @media (prefers-color-scheme: dark) {
+      .serp-shield-btn { color:#bdbdbd; }
+    }
+    .theme-dark .serp-shield-btn { color:#bdbdbd; }
+
+    /* Top status line — search time + results hidden by the user's shield prefs.
+       Sits between the language/filters row and the results column. The left
+       margin mirrors .search_filters (@results-offset + 0.6rem) so it lines up
+       with the filters above it rather than running to the page edge. */
+    .serp-statusbar {
+      display:flex; align-items:center; flex-wrap:wrap; gap:5px 11px;
+      margin:2px 2rem 14px 10.6rem; padding:0 2px; font-size:0.78rem; color:#70757a;
+    }
+    @media screen and (max-width:79.75em) {
+      .serp-statusbar { margin-left:3.5rem; }  /* @results-tablet-offset + 3rem */
+    }
+    @media screen and (min-width:50em) {
+      .center-alignment-yes #main_results .serp-statusbar {
+        width:var(--center-page-width); margin-left:0.5rem; margin-right:0;
+      }
+    }
+    .serp-status-time { display:inline-flex; align-items:center; gap:6px; }
+    .serp-status-time svg { width:13px; height:13px; opacity:0.7; }
+    .serp-status-sep { opacity:0.4; }
+    .serp-status-blocked {
+      display:inline-flex; align-items:center; gap:6px; background:transparent;
+      border:none; padding:0; margin:0; color:inherit; font:inherit; font-size:0.78rem;
+      cursor:default;
+    }
+    .serp-status-blocked svg { width:13px; height:13px; opacity:0.7; flex-shrink:0; }
+    .serp-status-blocked.has-blocked { cursor:pointer; color:#c0392b; }
+    .serp-status-blocked.has-blocked svg { opacity:0.95; }
+    .serp-status-view { text-decoration:underline; opacity:0.85; }
+    .serp-status-blocked.has-blocked:hover .serp-status-view { opacity:1; }
+    .serp-status-host {
+      flex:1 1 auto; min-width:0; font-weight:600; color:var(--color-base-font,#444);
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .serp-status-ttl { color:#8a8a8a; font-weight:400; }
+    /* Blocked-results modal: same card as the shield panel, just a scrollable
+       list of hidden sites with an Unblock action (no per-site connection/stats). */
+    .serp-blk-ic {
+      display:inline-flex; align-items:center; justify-content:center;
+      color:#c0392b; background:rgba(192,57,43,0.12);
+    }
+    .serp-blk-ic svg { width:14px; height:14px; }
+    .serp-blk-body { padding:8px 8px 12px; }
+    .serp-blk-list { max-height:min(52vh,380px); overflow-y:auto; }
+    .serp-blk-row {
+      display:flex; align-items:center; gap:10px; padding:9px 8px;
+      border-top:1px solid rgba(127,127,127,0.12);
+    }
+    .serp-blk-row:first-child { border-top:none; }
+    .serp-blk-row button {
+      flex-shrink:0; background:transparent; border:1px solid rgba(127,127,127,0.3);
+      border-radius:6px; color:inherit; font:inherit; font-size:0.76rem; padding:3px 10px; cursor:pointer;
+    }
+    .serp-blk-row button:hover { color:#4285f4; border-color:rgba(66,133,244,0.45); }
+    @media (prefers-color-scheme: dark) { .serp-statusbar { color:#9aa0a6; } }
+    .theme-dark .serp-statusbar { color:#9aa0a6; }
+
+    /* ── Lenses: saved filter-set dropdown below the search bar ───────────── */
+    .serp-lens { position:relative; display:inline-flex; vertical-align:middle; }
+    .search_filters .serp-lens { margin-left:0.4rem; }
+    #search_view .serp-lens { margin:0.55rem auto 0; }
+    .serp-lens-btn {
+      display:inline-flex; align-items:center; gap:6px;
+      background:rgba(127,127,127,0.06); border:1px solid rgba(127,127,127,0.28);
+      border-radius:8px; color:var(--color-base-font,#444); font:inherit; font-size:0.82rem;
+      padding:5px 9px; cursor:pointer; transition:background .12s,border-color .12s,color .12s;
+    }
+    .serp-lens-btn:hover { background:rgba(66,133,244,0.08); border-color:rgba(66,133,244,0.4); }
+    .serp-lens.active .serp-lens-btn { color:#1f6feb; border-color:rgba(31,111,235,0.5); background:rgba(31,111,235,0.08); }
+    .serp-lens-ic { display:inline-flex; } .serp-lens-ic svg { width:14px; height:14px; }
+    .serp-lens-caret svg { width:13px; height:13px; opacity:0.7; }
+    .serp-lens-cur { font-weight:600; white-space:nowrap; }
+    .serp-lens-menu {
+      position:absolute; top:calc(100% + 6px); left:0; z-index:9998; min-width:210px;
+      background:var(--color-base-background,#fff); border:1px solid rgba(127,127,127,0.22);
+      border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,0.22); padding:6px;
+      animation:serp-fade .1s ease;
+    }
+    .serp-lens-item {
+      display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
+      background:transparent; border:none; border-radius:8px; color:var(--color-base-font,#333);
+      font:inherit; font-size:0.85rem; text-align:left; padding:8px 10px; cursor:pointer;
+    }
+    .serp-lens-item:hover { background:rgba(127,127,127,0.1); }
+    .serp-lens-item.active { background:rgba(31,111,235,0.12); color:#1f6feb; font-weight:600; }
+    .serp-lens-mode { font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:#9aa0a6; }
+    .serp-lens-item.active .serp-lens-mode { color:#1f6feb; }
+    .serp-lens-divider { height:1px; background:rgba(127,127,127,0.16); margin:5px 6px; }
+    .serp-lens-edit-btn { color:#1f6feb; font-weight:600; }
+
+    /* Lens manager modal (reuses .serp-modal shell) */
+    .serp-lens-modal { max-width:480px; }
+    .serp-lens-headic { display:inline-flex; align-items:center; justify-content:center; padding:3px; color:#1f6feb; }
+    .serp-lens-headic svg { width:16px; height:16px; }
+    .serp-lens-mgr { max-height:min(70vh,560px); overflow-y:auto; }
+    .serp-lens-edit { border:1px solid rgba(127,127,127,0.2); border-radius:12px; padding:10px; margin-bottom:10px; }
+    .serp-lens-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .serp-lens-name {
+      flex:1 1 auto; min-width:0; font:inherit; font-size:0.9rem; font-weight:600;
+      padding:6px 9px; border:1px solid rgba(127,127,127,0.28); border-radius:8px;
+      background:var(--color-base-background,#fff); color:var(--color-base-font,#202124);
+    }
+    .serp-lens-modeseg { display:inline-flex; border:1px solid rgba(127,127,127,0.28); border-radius:8px; overflow:hidden; flex-shrink:0; }
+    .serp-lens-modeseg button {
+      background:rgba(127,127,127,0.06); border:none; border-left:1px solid rgba(127,127,127,0.18);
+      color:var(--color-base-font,#444); font:inherit; font-size:0.76rem; font-weight:600; padding:6px 10px; cursor:pointer;
+    }
+    .serp-lens-modeseg button:first-child { border-left:none; }
+    .serp-lens-modeseg button.active { background:#1f6feb; color:#fff; }
+    .serp-lens-del {
+      flex-shrink:0; background:transparent; border:1px solid rgba(127,127,127,0.28); border-radius:8px;
+      width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center;
+      color:#9aa0a6; cursor:pointer;
+    }
+    .serp-lens-del:hover { color:#c0392b; border-color:rgba(192,57,43,0.45); background:rgba(192,57,43,0.08); }
+    .serp-lens-del svg { width:14px; height:14px; }
+    .serp-lens-sites {
+      width:100%; box-sizing:border-box; font:inherit; font-size:0.82rem; line-height:1.5;
+      padding:8px 10px; border:1px solid rgba(127,127,127,0.28); border-radius:8px; resize:vertical;
+      background:var(--color-base-background,#fff); color:var(--color-base-font,#202124);
+    }
+    .serp-lens-add {
+      width:100%; background:transparent; border:1px dashed rgba(127,127,127,0.4); border-radius:10px;
+      color:var(--color-base-font,#444); font:inherit; font-size:0.85rem; font-weight:600; padding:9px; cursor:pointer;
+    }
+    .serp-lens-add:hover { color:#1f6feb; border-color:rgba(31,111,235,0.5); background:rgba(31,111,235,0.06); }
+    .serp-lens-help, .serp-lens-empty { font-size:0.76rem; color:#8a8a8a; margin:10px 2px 0; line-height:1.5; }
+    .theme-dark .serp-lens-name, .theme-dark .serp-lens-sites { color:#e8e8e8; background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.18); }
+    .theme-dark .serp-lens-btn { color:#cfcfcf; }
+    .theme-dark .serp-lens-menu, .theme-dark .serp-lens-edit { border-color:rgba(255,255,255,0.14); }
   `;
 
   function injectStyles() {
@@ -309,6 +557,13 @@
     game: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><rect x="2" y="6" width="20" height="12" rx="4"/></svg>',
     maps: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
     directions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>',
+    shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+    globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg>',
+    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+    starline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 .59l3.09 6.26 6.91 1-5 4.87 1.18 6.88L12 16.5l-6.18 3.25L7 12.72l-5-4.87 6.91-1z"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>',
   };
 
   function fmtNum(n) {
@@ -605,10 +860,22 @@
 
   // ── "Where to watch" box (film/TV queries) ─────────────────────────────────
 
-  // Hosts that mark a result set as a film/TV query (mirrors the server-side
-  // intent_boost.ENTERTAINMENT_REF list). iket.me is libremdb (IMDb frontend).
-  const ENT_HOSTS = ["imdb.com", "iket.me", "themoviedb.org", "rottentomatoes.com",
-    "metacritic.com", "justwatch.com", "thetvdb.com", "letterboxd.com"];
+  // Title-page URLs that mark a result set as a film/TV query (mirrors the
+  // server-side intent_boost.ENTERTAINMENT_REF list). Matched against the full
+  // "host/path" — a bare domain is NOT enough: a real film/TV query always
+  // surfaces a title page, whereas a generic query ("why are search results so
+  // bad") only ever picks up a stray article/list page on one of these hosts,
+  // which used to wrongly light up the watch box. iket.me is libremdb.
+  const ENT_TITLE_RE = [
+    /(^|\.)imdb\.com\/(?:[a-z]{2}\/)?title\/tt\d+/,
+    /(^|\.)iket\.me\/title\/tt\d+/,
+    /(^|\.)themoviedb\.org\/(?:movie|tv)\/\d+/,
+    /(^|\.)rottentomatoes\.com\/(?:m|tv)\/[^/]+/,
+    /(^|\.)metacritic\.com\/(?:movie|tv|tv-show)\/[^/]+/,
+    /(^|\.)justwatch\.com\//,
+    /(^|\.)thetvdb\.com\/(?:series|movies)\/[^/]+/,
+    /(^|\.)letterboxd\.com\/film\/[^/]+/,
+  ];
 
   // Explicit film/TV qualifiers in the query (independent of the result set, so
   // they fire even when a same-named game or product dominates the results).
@@ -630,8 +897,10 @@
     let found = false;
     document.querySelectorAll(".result").forEach((r) => {
       if (found) return;
-      const h = hostnameOf(resultUrl(r));
-      if (h && ENT_HOSTS.some((e) => h === e || h.endsWith("." + e))) found = true;
+      const u = resultUrl(r);
+      if (!u) return;
+      const hostPath = u.replace(/^https?:\/\//i, "").toLowerCase();
+      if (ENT_TITLE_RE.some((re) => re.test(hostPath))) found = true;
     });
     return found;
   }
@@ -1223,8 +1492,15 @@
         wrap.appendChild(buildGroup("GitHub", ICON.github, "github", github.slice(0, TOP_MAX), newTab));
 
       // Sits at the very top of the results column, just under the AI summary.
+      // #results is a named-area grid; a stray child with no grid-area gets
+      // auto-placed into the first free top cell or overflows to an implicit
+      // row at the bottom (which happens when an answer/correction already
+      // occupies the top cells). Inserting inside #urls — which owns the
+      // "urls" grid-area — keeps the wrap pinned to the top of the result list.
+      const urls = document.getElementById("urls");
       const ai = document.getElementById("ai-summary-wrapper");
-      if (ai && ai.parentNode === results) ai.after(wrap);
+      if (urls) urls.insertBefore(wrap, urls.firstChild);
+      else if (ai && ai.parentNode === results) ai.after(wrap);
       else results.insertBefore(wrap, results.firstChild);
     }
 
@@ -1235,6 +1511,456 @@
     if (wantWatch) ensureWatchBox(wrap, newTab);
     // Maps box last → it lands at the very top for local "near me" queries.
     if (wantMaps) ensureMapsBox(wrap, newTab);
+  }
+
+  // ── Site shield: per-result priority + info panel ──────────────────────────
+  // The shield on each result opens a panel to (a) adjust how that domain ranks
+  // — Block / Lower / Normal / Raise / Pin — and (b) see site info (connection,
+  // popularity, registration). Per-user adjustments live in localStorage and are
+  // applied client-side by reordering/hiding results; an admin can additionally
+  // push an adjustment globally (server-side) from the same control.
+
+  const PRIO_KEY = "usearch.sitePriority";
+  const ADMIN_KEY = "usearch.adminToken";
+  const PRIO_LEVELS = ["block", "lower", "normal", "raise", "pin"];
+  const PRIO_LABEL = { block: "Block", lower: "Lower", normal: "Normal", raise: "Raise", pin: "Pin" };
+  const PRIO_RANK = { pin: 0, raise: 1, normal: 2, lower: 3, block: 4 };
+
+  function loadPrio() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(PRIO_KEY) || "{}");
+      if (raw && typeof raw === "object") return raw;
+    } catch (_) { /* ignore */ }
+    return {};
+  }
+  function savePrio(map) {
+    try { localStorage.setItem(PRIO_KEY, JSON.stringify(map)); } catch (_) { /* ignore */ }
+  }
+  // Match a host against the store, walking subdomains off the front so a rule on
+  // "medium.com" also covers "blog.medium.com" (mirrors the server lookup).
+  function getLevel(host) {
+    if (!host) return "normal";
+    const map = loadPrio();
+    const labels = host.split(".");
+    for (let i = 0; i < labels.length - 1; i++) {
+      const lvl = map[labels.slice(i).join(".")];
+      if (lvl && PRIO_LEVELS.indexOf(lvl) !== -1) return lvl;
+    }
+    return "normal";
+  }
+  function setLevel(host, level) {
+    if (!host) return;
+    const map = loadPrio();
+    if (level === "normal") delete map[host];
+    else map[host] = level;
+    savePrio(map);
+    applyPriorities();
+  }
+
+  function getAdminToken() {
+    try { return localStorage.getItem(ADMIN_KEY) || ""; } catch (_) { return ""; }
+  }
+  function setAdminToken(t) {
+    try { if (t) localStorage.setItem(ADMIN_KEY, t); else localStorage.removeItem(ADMIN_KEY); } catch (_) { /* ignore */ }
+  }
+
+  // Reflect a result's current level: collapse blocked ones to a reversible
+  // stub, dim lowered ones, and tint that result's shield button. Idempotent.
+  function styleResult(result, host, level) {
+    result.dataset.serpLevel = level;
+    result.classList.toggle("serp-lowered", level === "lower");
+    const blocked = level === "block";
+    result.classList.toggle("serp-blocked", blocked);
+    let note = result.querySelector(":scope > .serp-blocked-note");
+    if (blocked && !note) {
+      note = document.createElement("div");
+      note.className = "serp-blocked-note";
+      note.innerHTML = "<span></span><button type=\"button\">" + _("Unblock") + "</button>";
+      note.querySelector("span").textContent = host + " " + _("blocked");
+      note.querySelector("button").addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation(); setLevel(host, "normal");
+      });
+      result.appendChild(note);
+    } else if (!blocked && note) {
+      note.remove();
+    }
+    const btn = result.querySelector(":scope .serp-shield-btn");
+    if (btn) {
+      btn.className = "serp-shield-btn" + (level !== "normal" ? " lvl-" + level : "");
+      btn.title = level === "normal" ? _("Adjust this site") : (PRIO_LABEL[level] + " · " + host);
+    }
+  }
+
+  // Apply all per-user priorities: tag every result, then reorder #urls so
+  // pinned float up and lowered/blocked sink. Only writes the DOM when the order
+  // actually changes, so the mutation observer doesn't loop.
+  function applyPriorities() {
+    const urls = document.getElementById("urls");
+    if (!urls) return;
+    const results = Array.prototype.filter.call(
+      urls.children, (el) => el.classList && el.classList.contains("result"));
+    if (!results.length) return;
+
+    results.forEach((r) => {
+      const host = hostnameOf(resultUrl(r));
+      // Manual per-site rules win; an active "favor" lens fills in for sites the
+      // user hasn't touched, raising them to the top.
+      let level = getLevel(host);
+      if (level === "normal" && lensFavorHost(host)) level = "raise";
+      styleResult(r, host, level);
+    });
+
+    const desired = results
+      .map((r, i) => ({ r, i, rank: PRIO_RANK[r.dataset.serpLevel] != null ? PRIO_RANK[r.dataset.serpLevel] : 2 }))
+      .sort((a, b) => (a.rank - b.rank) || (a.i - b.i))
+      .map((o) => o.r);
+
+    const changed = desired.some((r, i) => r !== results[i]);
+    if (changed) {
+      const frag = document.createDocumentFragment();
+      desired.forEach((r) => frag.appendChild(r));
+      urls.appendChild(frag);
+    }
+
+    updateStatusBlocked();
+  }
+
+  // ── Top status line: search time + "blocked by your preferences" ─────────────
+  // A small line just under the language/filters row: how long the search took
+  // (from the browser's navigation timing) and how many results on this page are
+  // hidden by the per-site shield. The count reflects the live localStorage
+  // priorities, so it updates whenever a site is blocked or unblocked.
+
+  function searchTimeText() {
+    let ms = null;
+    try {
+      const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+      if (nav && nav.responseEnd > 0 && nav.requestStart >= 0) ms = nav.responseEnd - nav.requestStart;
+      if ((ms == null || ms <= 0) && performance.timing) {
+        const t = performance.timing;
+        if (t.responseEnd && t.requestStart) ms = t.responseEnd - t.requestStart;
+      }
+    } catch (_) { /* ignore */ }
+    if (ms == null || !isFinite(ms) || ms <= 0) return "";
+    return (ms / 1000).toFixed(2) + " " + _("seconds");
+  }
+
+  function blockedResults() {
+    const urls = document.getElementById("urls");
+    if (!urls) return [];
+    return Array.prototype.slice.call(urls.querySelectorAll(".result.serp-blocked"));
+  }
+
+  function buildStatusBar() {
+    const results = document.getElementById("results");
+    if (!results || !results.parentNode) return;
+    if (!document.querySelector("#urls .result")) return;  // only on a results page
+
+    if (!document.getElementById("serp-statusbar")) {
+      const bar = document.createElement("div");
+      bar.id = "serp-statusbar";
+      bar.className = "serp-statusbar";
+      const t = searchTimeText();
+      bar.innerHTML =
+        (t ? '<span class="serp-status-time">' + ICON.clock + "<span>" +
+              esc(_("Search completed in") + " " + t) + "</span></span>" +
+             '<span class="serp-status-sep">·</span>' : "") +
+        '<button type="button" class="serp-status-blocked"></button>';
+      results.parentNode.insertBefore(bar, results);
+
+      bar.querySelector(".serp-status-blocked").addEventListener("click", (e) => {
+        e.preventDefault();
+        if (!e.currentTarget.classList.contains("has-blocked")) return;
+        openBlockedPanel();
+      });
+    }
+    updateStatusBlocked();
+  }
+
+  function updateStatusBlocked() {
+    const bar = document.getElementById("serp-statusbar");
+    if (!bar) return;
+    const blocked = blockedResults();
+    // Skip the rebuild when nothing changed (the observer fires often).
+    const sig = blocked.map((r) => hostnameOf(resultUrl(r)) || "?").join("|");
+    if (bar.dataset.blockedSig === sig) return;
+    bar.dataset.blockedSig = sig;
+
+    const toggle = bar.querySelector(".serp-status-blocked");
+    const n = blocked.length;
+    const has = n > 0;
+
+    toggle.classList.toggle("has-blocked", has);
+    toggle.innerHTML = ICON.shield + "<span>" +
+      esc(n + " " + (n === 1
+        ? _("query blocked due to your preferences")
+        : _("queries blocked due to your preferences"))) + "</span>" +
+      (has ? ' <span class="serp-status-view">' + esc(_("click to view")) + "</span>" : "");
+    toggle.title = has ? _("Show the results hidden by your site preferences") : "";
+  }
+
+  // ── The panel ───────────────────────────────────────────────────────────────
+
+  let _panelEsc = null;
+  function closePanel() {
+    const back = document.getElementById("serp-modal-backdrop");
+    if (back) back.remove();
+    if (_panelEsc) { document.removeEventListener("keydown", _panelEsc); _panelEsc = null; }
+  }
+
+  function infoRow(icon, key, valueHtml, muted) {
+    return '<li><span class="serp-info-ic">' + icon + "</span>" +
+      '<span class="serp-info-k">' + esc(key) + "</span>" +
+      '<span class="serp-info-v' + (muted ? " muted" : "") + '">' + valueHtml + "</span></li>";
+  }
+
+  function fmtRegDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+    if (!m) return "";
+    const months = ["January", "February", "March", "April", "May", "June", "July",
+      "August", "September", "October", "November", "December"];
+    const mon = months[parseInt(m[2], 10) - 1] || "";
+    return mon + " " + parseInt(m[3], 10) + ", " + m[1];
+  }
+
+  function openPanel(opts) {
+    closePanel();
+    const host = opts.host;
+    const url = opts.url;
+
+    const back = document.createElement("div");
+    back.id = "serp-modal-backdrop";
+    back.className = "serp-modal-backdrop";
+
+    const favHtml = opts.favSrc
+      ? '<img class="serp-modal-fav" src="' + esc(opts.favSrc) + '" alt="">'
+      : '<span class="serp-modal-fav"></span>';
+
+    const seg = PRIO_LEVELS.map((lv) =>
+      '<button type="button" data-lvl="' + lv + '" class="act-' + lv + '">' +
+      esc(PRIO_LABEL[lv]) + "</button>").join("");
+
+    back.innerHTML =
+      '<div class="serp-modal" role="dialog" aria-modal="true">' +
+        '<div class="serp-modal-head">' + favHtml +
+          '<div class="serp-modal-titles">' +
+            '<p class="serp-modal-title"></p>' +
+            '<div class="serp-modal-host"></div>' +
+          "</div>" +
+          '<button type="button" class="serp-modal-close" aria-label="Close">' + ICON.close + "</button>" +
+        "</div>" +
+        '<div class="serp-modal-body">' +
+          '<div class="serp-rank-label">' +
+            "<span>" + _("Ranking adjustment for") + " " + esc(host) + "</span>" +
+            '<span class="serp-rank-info" title="' +
+              esc(_("Block hides this site, Lower/Raise nudge it down/up, Pin floats it to the top. Saved in this browser.")) +
+            '">' + ICON.info + "</span>" +
+          "</div>" +
+          '<div class="serp-seg">' + seg + "</div>" +
+          '<div class="serp-global" style="display:none">' +
+            "<span>" + _("Global") + ": <b class=\"serp-global-cur\">normal</b></span>" +
+            '<button type="button" class="serp-global-btn">' + _("Apply globally") + "</button>" +
+            '<div class="serp-global-msg"></div>' +
+          "</div>" +
+          '<ul class="serp-info">' +
+            infoRow(ICON.lock, _("Connection"), '<span class="serp-info-conn">…</span>', true) +
+            infoRow(ICON.starline, _("Popularity"), '<span class="serp-info-pop">…</span>', true) +
+            infoRow(ICON.globe, _("Domain registered"), '<span class="serp-info-reg">…</span>', true) +
+            infoRow(ICON.user, _("Owned by"), '<span class="serp-info-own">…</span>', true) +
+          "</ul>" +
+        "</div>" +
+      "</div>";
+
+    back.querySelector(".serp-modal-title").textContent = opts.title || host;
+    back.querySelector(".serp-modal-host").textContent = host;
+
+    document.body.appendChild(back);
+
+    // Close interactions.
+    back.addEventListener("click", (e) => { if (e.target === back) closePanel(); });
+    back.querySelector(".serp-modal-close").addEventListener("click", closePanel);
+    _panelEsc = (e) => { if (e.key === "Escape") closePanel(); };
+    document.addEventListener("keydown", _panelEsc);
+
+    // Segmented control.
+    const segEl = back.querySelector(".serp-seg");
+    function paintSeg() {
+      const cur = getLevel(host);
+      segEl.querySelectorAll("button").forEach((b) =>
+        b.classList.toggle("active", b.dataset.lvl === cur));
+    }
+    paintSeg();
+    segEl.querySelectorAll("button").forEach((b) => {
+      b.addEventListener("click", () => {
+        setLevel(host, b.dataset.lvl);
+        paintSeg();
+        // Setting a level is a one-shot action; the modal otherwise covers the
+        // whole page, hiding the result collapsing and the top "blocked" count
+        // from updating. Close it so the change is immediately visible.
+        closePanel();
+      });
+    });
+
+    // Global control + site info (one fetch).
+    const globalWrap = back.querySelector(".serp-global");
+    const globalCur = back.querySelector(".serp-global-cur");
+    const globalBtn = back.querySelector(".serp-global-btn");
+    const globalMsg = back.querySelector(".serp-global-msg");
+    const conn = back.querySelector(".serp-info-conn");
+    const pop = back.querySelector(".serp-info-pop");
+    const reg = back.querySelector(".serp-info-reg");
+    const own = back.querySelector(".serp-info-own");
+
+    globalBtn.addEventListener("click", () => {
+      let token = getAdminToken();
+      if (!token) {
+        token = (window.prompt(_("Admin token to apply this globally:")) || "").trim();
+        if (!token) return;
+        setAdminToken(token);
+      }
+      const level = getLevel(host);
+      globalBtn.disabled = true;
+      globalMsg.className = "serp-global-msg";
+      globalMsg.textContent = _("Saving…");
+      fetch("/site_priority", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+        body: JSON.stringify({ host: host, level: level }),
+      })
+        .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+        .then(({ ok, d }) => {
+          globalBtn.disabled = false;
+          if (ok && d && d.ok) {
+            globalCur.textContent = level;
+            globalMsg.className = "serp-global-msg ok";
+            globalMsg.textContent = _("Applied for everyone.");
+          } else {
+            if (d && (d.error === "forbidden" || d.error === "disabled")) setAdminToken("");
+            globalMsg.className = "serp-global-msg err";
+            globalMsg.textContent = d && d.error === "forbidden"
+              ? _("Wrong admin token.") : _("Couldn't apply globally.");
+          }
+        })
+        .catch(() => {
+          globalBtn.disabled = false;
+          globalMsg.className = "serp-global-msg err";
+          globalMsg.textContent = _("Couldn't apply globally.");
+        });
+    });
+
+    fetch("/site_info?url=" + encodeURIComponent(url), { headers: { Accept: "application/json" } })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d || d.type !== "site") { conn.textContent = pop.textContent = reg.textContent = own.textContent = "—"; return; }
+        conn.parentElement.classList.remove("muted");
+        conn.innerHTML = d.secure
+          ? _("This site uses") + ' <span class="ok">' + esc(d.scheme) + "</span>"
+          : esc((d.scheme || "http") + " (not secure)");
+        pop.textContent = (typeof d.popularity_rank === "number")
+          ? "#" + d.popularity_rank + " " + _("by traffic") : _("Not in top sites");
+        reg.textContent = fmtRegDate(d.registered) || _("Unknown");
+        own.textContent = d.owner || _("Private / redacted");
+        if (d.admin_enabled) {
+          globalWrap.style.display = "";
+          globalCur.textContent = d.global_priority || "normal";
+        }
+      })
+      .catch(() => { conn.textContent = pop.textContent = reg.textContent = own.textContent = "—"; });
+  }
+
+  // The "N queries blocked" status opens this: the same modal card as the shield
+  // panel, but just a scrollable list of the sites hidden on this page with an
+  // Unblock action — no per-site connection/stats. Reuses closePanel/backdrop.
+  function openBlockedPanel() {
+    closePanel();
+    const blocked = blockedResults();
+    if (!blocked.length) return;
+
+    const back = document.createElement("div");
+    back.id = "serp-modal-backdrop";
+    back.className = "serp-modal-backdrop";
+    back.innerHTML =
+      '<div class="serp-modal" role="dialog" aria-modal="true">' +
+        '<div class="serp-modal-head">' +
+          '<span class="serp-modal-fav serp-blk-ic">' + ICON.shield + "</span>" +
+          '<div class="serp-modal-titles">' +
+            '<p class="serp-modal-title">' + esc(_("Blocked sites")) + "</p>" +
+            '<div class="serp-modal-host"></div>' +
+          "</div>" +
+          '<button type="button" class="serp-modal-close" aria-label="Close">' + ICON.close + "</button>" +
+        "</div>" +
+        '<div class="serp-modal-body serp-blk-body">' +
+          '<div class="serp-blk-list"></div>' +
+        "</div>" +
+      "</div>";
+
+    const sub = back.querySelector(".serp-modal-host");
+    const list = back.querySelector(".serp-blk-list");
+    function setSub(count) {
+      sub.textContent = count + " " + (count === 1
+        ? _("result hidden on this page") : _("results hidden on this page"));
+    }
+    setSub(blocked.length);
+
+    blocked.forEach((r) => {
+      const host = hostnameOf(resultUrl(r)) || "";
+      const h3 = r.querySelector("h3");
+      const title = h3 ? h3.textContent.trim() : "";
+      const row = document.createElement("div");
+      row.className = "serp-blk-row";
+      row.innerHTML =
+        '<span class="serp-status-host">' + esc(host) +
+          (title && title !== host ? ' <span class="serp-status-ttl">— ' + esc(title) + "</span>" : "") +
+        '</span><button type="button">' + esc(_("Unblock")) + "</button>";
+      row.querySelector("button").addEventListener("click", (e) => {
+        e.preventDefault();
+        setLevel(host, "normal");
+        row.remove();
+        const left = list.querySelectorAll(".serp-blk-row").length;
+        if (!left) { closePanel(); return; }
+        setSub(left);
+      });
+      list.appendChild(row);
+    });
+
+    document.body.appendChild(back);
+    back.addEventListener("click", (e) => { if (e.target === back) closePanel(); });
+    back.querySelector(".serp-modal-close").addEventListener("click", closePanel);
+    _panelEsc = (e) => { if (e.key === "Escape") closePanel(); };
+    document.addEventListener("keydown", _panelEsc);
+  }
+
+  function enhanceShields(root) {
+    (root || document).querySelectorAll(".result").forEach((result) => {
+      if (result.dataset.serpShield) return;
+      const url = resultUrl(result);
+      const host = url && hostnameOf(url);
+      if (!host) return;
+      result.dataset.serpShield = "1";
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "serp-shield-btn";
+      btn.innerHTML = ICON.shield;
+      btn.title = _("Adjust this site");
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const img = result.querySelector(".favicon-img, img.favicon");
+        const a = result.querySelector("h3 a") || result.querySelector("h3");
+        openPanel({
+          host: host,
+          url: resultUrl(result),
+          title: a ? a.textContent.trim() : host,
+          favSrc: img ? (img.src || img.getAttribute("src") || "") : "",
+        });
+      });
+      // Sit it inline right after the result title. (It can't go in the header
+      // row — .url_header is an <a> and nested buttons aren't valid.)
+      const h3 = result.querySelector("h3");
+      if (h3) h3.appendChild(btn);
+      else result.appendChild(btn);
+    });
   }
 
   // ── 3. Copy-summary button on the AI summary block ─────────────────────────
@@ -1261,6 +1987,325 @@
     header.appendChild(makeCopyBtn("Copy summary", aiSummaryText));
   }
 
+  // ── Lenses: per-browser saved filter sets (Kagi-style) ─────────────────────
+  // A "Lens" dropdown below the search bar lets the user define named filter sets
+  // — e.g. "Deals", "Movies" — and switch between them before searching. Each lens
+  // has a mode:
+  //   "only"  → true scoping: the query is rewritten with (site:a OR site:b …) on
+  //             submit so the engines actually return pages from those sites.
+  //   "favor" → soft boost: the lens's sites are raised in applyPriorities() so
+  //             they float to the top of the organic results (client re-rank).
+  // Definitions live in localStorage (this browser only), mirroring the per-user
+  // side of the site shield.
+
+  const LENS_KEY = "usearch.lenses";
+  const LENS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>';
+  const CARET_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+
+  // Seeded on first run so the feature is discoverable; fully editable/deletable.
+  const LENS_SEED = {
+    active: "",
+    lenses: [
+      { id: "deals", name: "Deals", mode: "only",
+        sites: ["slickdeals.net", "dealnews.com", "hotukdeals.com",
+                "camelcamelcamel.com", "retailmenot.com", "idealo.co.uk"] },
+      { id: "movies", name: "Movies", mode: "favor",
+        sites: ["imdb.com", "rottentomatoes.com", "letterboxd.com",
+                "themoviedb.org", "metacritic.com"] },
+    ],
+  };
+
+  function loadLenses() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LENS_KEY) || "null");
+      if (raw && Array.isArray(raw.lenses)) return raw;
+    } catch (_) { /* ignore */ }
+    saveLenses(LENS_SEED);
+    return JSON.parse(JSON.stringify(LENS_SEED));
+  }
+  function saveLenses(state) {
+    try { localStorage.setItem(LENS_KEY, JSON.stringify(state)); } catch (_) { /* ignore */ }
+  }
+  function activeLens() {
+    const st = loadLenses();
+    return st.active ? (st.lenses.find((l) => l.id === st.active) || null) : null;
+  }
+  function setActiveLens(id) {
+    const st = loadLenses();
+    st.active = id || "";
+    saveLenses(st);
+  }
+  function uniqueLensId(st) {
+    let id;
+    do { id = "lens-" + Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e4).toString(36); }
+    while (st.lenses.some((l) => l.id === id));
+    return id;
+  }
+
+  // Normalise a user-entered line to a bare host (drop scheme/path/www).
+  function cleanDomain(line) {
+    let s = (line || "").trim().toLowerCase();
+    if (!s) return "";
+    s = s.replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^www\./, "");
+    return s.split(/\s+/)[0] || "";
+  }
+
+  // Build the site: clause for an "only" lens. Plain lines → include, lines
+  // prefixed "-"/"!" → exclude. Includes are OR-grouped; excludes appended after.
+  function lensClause(lens) {
+    const inc = [], exc = [];
+    (lens.sites || []).forEach((raw) => {
+      const neg = /^[-!]/.test(raw);
+      const host = cleanDomain(neg ? raw.slice(1) : raw);
+      if (!host) return;
+      (neg ? exc : inc).push(host);
+    });
+    let clause = "";
+    if (inc.length === 1) clause = "site:" + inc[0];
+    else if (inc.length > 1) clause = "(" + inc.map((h) => "site:" + h).join(" OR ") + ")";
+    if (exc.length) clause += (clause ? " " : "") + exc.map((h) => "-site:" + h).join(" ");
+    return clause;
+  }
+
+  // Strip a trailing site:/-site: clause we previously appended, so the visible
+  // query box stays clean and re-submitting doesn't stack clauses.
+  const LENS_CLAUSE_RE = /\s*(?:\((?:\s*-?site:[^\s()]+(?:\s+OR\s+)?)+\)|(?:\s*-?site:[^\s()]+)+)\s*$/i;
+  function stripLensClause(q) {
+    return (q || "").replace(LENS_CLAUSE_RE, "").trim();
+  }
+
+  // Is this host covered by the active "favor" lens? (subdomain walk, like getLevel)
+  function lensFavorHost(host) {
+    const lens = activeLens();
+    if (!lens || lens.mode !== "favor" || !host) return false;
+    const set = (lens.sites || []).map((s) => cleanDomain(s)).filter(Boolean);
+    if (!set.length) return false;
+    const labels = host.split(".");
+    for (let i = 0; i < labels.length - 1; i++) {
+      if (set.indexOf(labels.slice(i).join(".")) !== -1) return true;
+    }
+    return false;
+  }
+
+  function lensForm() { return document.getElementById("search"); }
+  function lensQ() { return document.getElementById("q"); }
+
+  // Inject the "Lens" dropdown into the filter row (results page) or just under
+  // the search box (home page). Idempotent.
+  function buildLensUI() {
+    const form = lensForm();
+    if (!form) return;
+    if (document.getElementById("serp-lens")) { refreshLensBtn(); return; }
+
+    const wrap = document.createElement("div");
+    wrap.id = "serp-lens";
+    wrap.className = "serp-lens";
+    wrap.innerHTML =
+      '<button type="button" class="serp-lens-btn" aria-haspopup="true" aria-expanded="false">' +
+        '<span class="serp-lens-ic">' + LENS_ICON + "</span>" +
+        '<span class="serp-lens-cur"></span>' +
+        '<span class="serp-lens-caret">' + CARET_ICON + "</span>" +
+      "</button>" +
+      '<div class="serp-lens-menu" hidden></div>';
+
+    const filters = form.querySelector(".search_filters");
+    if (filters) {
+      filters.appendChild(wrap);
+    } else {
+      const box = form.querySelector(".search_box") || form.querySelector("#search_header");
+      if (box && box.parentNode) box.parentNode.insertBefore(wrap, box.nextSibling);
+      else form.appendChild(wrap);
+    }
+
+    const btn = wrap.querySelector(".serp-lens-btn");
+    const menu = wrap.querySelector(".serp-lens-menu");
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (menu.hidden) openLensMenu(menu, btn); else closeLensMenu();
+    });
+
+    // Rewrite the query on submit for "only" lenses (true scoping). .submit()
+    // bypasses this handler, so selectLens() uses requestSubmit().
+    form.addEventListener("submit", () => {
+      const q = lensQ();
+      if (!q) return;
+      const clean = stripLensClause(q.value);
+      const lens = activeLens();
+      if (lens && lens.mode === "only") {
+        const clause = lensClause(lens);
+        q.value = clause ? (clean ? clean + " " + clause : clause) : clean;
+      } else {
+        q.value = clean;
+      }
+    });
+
+    // On the results page the server-rendered query may still carry a clause we
+    // appended last time — strip it for display so the box stays readable.
+    const q = lensQ();
+    if (q) q.value = stripLensClause(q.value);
+
+    refreshLensBtn();
+  }
+
+  function refreshLensBtn() {
+    const wrap = document.getElementById("serp-lens");
+    if (!wrap) return;
+    const lens = activeLens();
+    wrap.querySelector(".serp-lens-cur").textContent = lens ? lens.name : _("Lens");
+    wrap.classList.toggle("active", !!lens);
+  }
+
+  let _lensDocClick = null;
+  function closeLensMenu() {
+    const menu = document.querySelector("#serp-lens .serp-lens-menu");
+    const btn = document.querySelector("#serp-lens .serp-lens-btn");
+    if (menu) menu.hidden = true;
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    if (_lensDocClick) { document.removeEventListener("click", _lensDocClick); _lensDocClick = null; }
+  }
+
+  function openLensMenu(menu, btn) {
+    const st = loadLenses();
+    let html =
+      '<button type="button" class="serp-lens-item' + (!st.active ? " active" : "") +
+        '" data-id="">' + _("All") + "</button>";
+    st.lenses.forEach((l) => {
+      html += '<button type="button" class="serp-lens-item' +
+        (st.active === l.id ? " active" : "") + '" data-id="' + esc(l.id) + '">' +
+        "<span>" + esc(l.name) + "</span>" +
+        '<span class="serp-lens-mode">' + (l.mode === "only" ? _("only") : _("favor")) + "</span>" +
+      "</button>";
+    });
+    html += '<div class="serp-lens-divider"></div>' +
+      '<button type="button" class="serp-lens-item serp-lens-edit-btn">' + _("Edit…") + "</button>";
+    menu.innerHTML = html;
+    menu.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+
+    menu.querySelectorAll(".serp-lens-item").forEach((it) => {
+      it.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (it.classList.contains("serp-lens-edit-btn")) { closeLensMenu(); openLensManager(); return; }
+        selectLens(it.dataset.id);
+        closeLensMenu();
+      });
+    });
+
+    _lensDocClick = (e) => { if (!menu.parentNode.contains(e.target)) closeLensMenu(); };
+    setTimeout(() => document.addEventListener("click", _lensDocClick), 0);
+  }
+
+  function selectLens(id) {
+    setActiveLens(id);
+    refreshLensBtn();
+    const q = lensQ();
+    const onResults = !!document.getElementById("results");
+    if (onResults && q && stripLensClause(q.value)) {
+      const form = lensForm();
+      if (form.requestSubmit) form.requestSubmit(); else form.submit();
+    } else {
+      applyPriorities();  // home page / empty query: re-rank anything on screen
+    }
+  }
+
+  // ── Lens manager modal ──────────────────────────────────────────────────────
+
+  function openLensManager() {
+    closePanel();
+    const back = document.createElement("div");
+    back.id = "serp-modal-backdrop";
+    back.className = "serp-modal-backdrop";
+    back.innerHTML =
+      '<div class="serp-modal serp-lens-modal" role="dialog" aria-modal="true">' +
+        '<div class="serp-modal-head">' +
+          '<span class="serp-modal-fav serp-lens-headic">' + LENS_ICON + "</span>" +
+          '<div class="serp-modal-titles">' +
+            '<p class="serp-modal-title">' + _("Lenses") + "</p>" +
+            '<div class="serp-modal-host">' + _("Saved filter sets for this browser") + "</div>" +
+          "</div>" +
+          '<button type="button" class="serp-modal-close" aria-label="Close">' + ICON.close + "</button>" +
+        "</div>" +
+        '<div class="serp-modal-body serp-lens-mgr">' +
+          '<div class="serp-lens-list"></div>' +
+          '<button type="button" class="serp-lens-add">+ ' + _("Add lens") + "</button>" +
+          '<p class="serp-lens-help">' +
+            _("One domain per line. Prefix a line with “-” to exclude it. “Only” searches just these sites; “Favor” boosts them within normal results.") +
+          "</p>" +
+        "</div>" +
+      "</div>";
+    document.body.appendChild(back);
+    back.addEventListener("click", (e) => { if (e.target === back) closePanel(); });
+    back.querySelector(".serp-modal-close").addEventListener("click", closePanel);
+    _panelEsc = (e) => { if (e.key === "Escape") closePanel(); };
+    document.addEventListener("keydown", _panelEsc);
+
+    const list = back.querySelector(".serp-lens-list");
+    renderLensEditors(list);
+    back.querySelector(".serp-lens-add").addEventListener("click", () => {
+      const st = loadLenses();
+      st.lenses.push({ id: uniqueLensId(st), name: _("New lens"), mode: "only", sites: [] });
+      saveLenses(st);
+      renderLensEditors(list);
+    });
+  }
+
+  function renderLensEditors(list) {
+    const st = loadLenses();
+    list.innerHTML = "";
+    if (!st.lenses.length) {
+      const empty = document.createElement("p");
+      empty.className = "serp-lens-empty";
+      empty.textContent = _("No lenses yet — add one below.");
+      list.appendChild(empty);
+    }
+    st.lenses.forEach((lens) => {
+      const card = document.createElement("div");
+      card.className = "serp-lens-edit";
+      card.innerHTML =
+        '<div class="serp-lens-row">' +
+          '<input class="serp-lens-name" type="text" value="' + esc(lens.name) + '" placeholder="' + esc(_("Lens name")) + '">' +
+          '<div class="serp-lens-modeseg">' +
+            '<button type="button" data-mode="only"' + (lens.mode === "only" ? ' class="active"' : "") + ">" + _("Only") + "</button>" +
+            '<button type="button" data-mode="favor"' + (lens.mode === "favor" ? ' class="active"' : "") + ">" + _("Favor") + "</button>" +
+          "</div>" +
+          '<button type="button" class="serp-lens-del" aria-label="' + esc(_("Delete lens")) + '">' + ICON.close + "</button>" +
+        "</div>" +
+        '<textarea class="serp-lens-sites" rows="4" spellcheck="false" placeholder="example.com"></textarea>';
+      card.querySelector(".serp-lens-sites").value = (lens.sites || []).join("\n");
+
+      const nameEl = card.querySelector(".serp-lens-name");
+      nameEl.addEventListener("input", () => updateLens(lens.id, (l) => { l.name = nameEl.value; }));
+      const sitesEl = card.querySelector(".serp-lens-sites");
+      sitesEl.addEventListener("input", () => updateLens(lens.id, (l) => {
+        l.sites = sitesEl.value.split("\n").map((s) => s.trim()).filter(Boolean);
+      }));
+      card.querySelectorAll(".serp-lens-modeseg button").forEach((b) => {
+        b.addEventListener("click", () => {
+          updateLens(lens.id, (l) => { l.mode = b.dataset.mode; });
+          card.querySelectorAll(".serp-lens-modeseg button").forEach((x) => x.classList.toggle("active", x === b));
+        });
+      });
+      card.querySelector(".serp-lens-del").addEventListener("click", () => {
+        const st2 = loadLenses();
+        st2.lenses = st2.lenses.filter((l) => l.id !== lens.id);
+        if (st2.active === lens.id) st2.active = "";
+        saveLenses(st2);
+        renderLensEditors(list);
+        refreshLensBtn();
+      });
+      list.appendChild(card);
+    });
+  }
+
+  function updateLens(id, fn) {
+    const st = loadLenses();
+    const lens = st.lenses.find((l) => l.id === id);
+    if (!lens) return;
+    fn(lens);
+    saveLenses(st);
+    refreshLensBtn();
+  }
+
   // ── Orchestration ──────────────────────────────────────────────────────────
 
   function enhanceAll() {
@@ -1268,12 +2313,18 @@
     buildTopSection();
     enhanceCopyLinks(document);
     enhanceCards(document);
+    enhanceShields(document);
+    applyPriorities();
+    buildStatusBar();
     enhanceAiSummary();
   }
 
   function run() {
-    if (!document.getElementById("results") && !document.querySelector(".result")) return;
     injectStyles();
+    // The lens dropdown lives below the search bar, so it must init even on the
+    // home page where there are no results yet.
+    buildLensUI();
+    if (!document.getElementById("results") && !document.querySelector(".result")) return;
     enhanceAll();
 
     // Re-enhance results added by infinite scroll and the AI summary box, which

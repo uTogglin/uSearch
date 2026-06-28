@@ -48,7 +48,7 @@ from urllib.parse import urlsplit
 
 import httpx
 from flask_babel import gettext as _
-from searx import get_setting
+from searx import get_setting, popularity, site_priority
 from searx.plugins import Plugin, PluginInfo
 
 if t.TYPE_CHECKING:
@@ -254,6 +254,99 @@ def _fetch_reddit(post_id: str, sub: str) -> dict:
     }
 
 
+# ── Generic site info (for the "shield" panel) ────────────────────────────────
+
+def _panel_host(raw_url: str) -> "tuple[str, str] | None":
+    """Return ``(host, scheme)`` for a result URL, ``www.`` stripped, or None."""
+    try:
+        parts = urlsplit(raw_url)
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https"):
+        return None
+    host = (parts.hostname or "").lower().lstrip(".")
+    if host.startswith("www."):
+        host = host[4:]
+    if not host or not _HOST_ATTR_RE.match(host):
+        return None
+    return host, parts.scheme
+
+
+def _vcard_field(entity: dict, field: str) -> str:
+    """Pull a field (``org`` / ``fn``) out of an RDAP entity's jCard."""
+    try:
+        for item in entity.get("vcardArray", ["", []])[1]:
+            if item and item[0] == field and len(item) >= 4:
+                val = item[3]
+                if isinstance(val, list):
+                    val = " ".join(str(v) for v in val if v)
+                if val:
+                    return str(val)[:120]
+    except (IndexError, TypeError, KeyError):
+        pass
+    return ""
+
+
+def _parse_rdap(data: dict) -> dict:
+    """Extract registration date + registrant org from an RDAP domain record."""
+    registered = ""
+    for ev in data.get("events") or []:
+        if (ev.get("eventAction") or "").lower() == "registration":
+            registered = (ev.get("eventDate") or "")[:10]  # YYYY-MM-DD
+            break
+    owner = ""
+    for ent in data.get("entities") or []:
+        roles = [str(r).lower() for r in (ent.get("roles") or [])]
+        if "registrant" in roles:
+            owner = _vcard_field(ent, "org") or _vcard_field(ent, "fn")
+            if owner:
+                break
+    return {"registered": registered, "owner": owner}
+
+
+def _fetch_rdap(host: str) -> dict:
+    """Look up a domain via the public RDAP bootstrap (rdap.org).
+
+    The panel host may carry a subdomain (``blog.medium.com``); RDAP only knows
+    registrable domains, so walk labels off the front until one resolves.
+    """
+    timeout = float(_setting("timeout", 6))
+    labels = host.split(".")
+    last_exc: "Exception | None" = None
+    for i in range(len(labels) - 1):  # keep at least two labels
+        domain = ".".join(labels[i:])
+        try:
+            resp = httpx.get(
+                f"https://rdap.org/domain/{domain}",
+                headers={"User-Agent": _USER_AGENT, "Accept": "application/rdap+json"},
+                timeout=timeout, follow_redirects=True,
+            )
+            if resp.status_code == 404:
+                continue  # not the registrable domain — try the parent
+            resp.raise_for_status()
+            return _parse_rdap(resp.json())
+        except Exception as exc:  # noqa: BLE001 — RDAP is best-effort
+            last_exc = exc
+            continue
+    if last_exc is not None:
+        logger.info("card_meta rdap %s: %s", host, last_exc)
+    return {"registered": "", "owner": ""}
+
+
+def _site_info(host: str) -> dict:
+    """RDAP + popularity for a host (cacheable; global level added per request)."""
+    rdap = _fetch_rdap(host)
+    return {
+        "registered": rdap.get("registered") or "",
+        "owner": rdap.get("owner") or "",
+        "popularity_rank": popularity.rank(host),
+    }
+
+
+def _admin_token() -> str:
+    return (_setting("admin_token") or os.environ.get("USEARCH_ADMIN_TOKEN", "") or "").strip()
+
+
 class SXNGPlugin(Plugin):
     """GitHub result cards — server-side metadata proxy + injected JS."""
 
@@ -317,6 +410,62 @@ class SXNGPlugin(Plugin):
             return Response(json.dumps(data), mimetype="application/json",
                             headers={"X-Cache": "MISS"})
 
+        @app.route("/site_info", methods=["GET"])
+        def site_info():
+            url = freq.args.get("url", "").strip()[:600]
+            parsed = _panel_host(url) if url else None
+            if not parsed:
+                return Response('{"type":null}', mimetype="application/json", status=400)
+            host, scheme = parsed
+
+            base = _cache_get(f"si:{host}")
+            if base is None:
+                if not _check_rate_limit(_client_ip()):
+                    return Response('{"type":null,"error":"rate_limited"}',
+                                    mimetype="application/json", status=429)
+                try:
+                    base = _site_info(host)
+                except Exception as exc:  # noqa: BLE001 — never 500 the panel
+                    logger.warning("site_info %s error: %s", host, exc)
+                    base = {"registered": "", "owner": "", "popularity_rank": None}
+                _cache_set(f"si:{host}", base)
+
+            # Global level + admin availability are live (never cached).
+            data = dict(base)
+            data.update({
+                "type": "site",
+                "host": host,
+                "scheme": scheme,
+                "secure": scheme == "https",
+                "global_priority": site_priority.get(host),
+                "admin_enabled": bool(_admin_token()),
+            })
+            return Response(json.dumps(data), mimetype="application/json")
+
+        @app.route("/site_priority", methods=["POST"])
+        def set_site_priority():
+            token = _admin_token()
+            if not token:
+                return Response('{"ok":false,"error":"disabled"}',
+                                mimetype="application/json", status=403)
+            supplied = (freq.headers.get("X-Admin-Token", "")
+                        or freq.form.get("token", "")).strip()
+            if supplied != token:
+                return Response('{"ok":false,"error":"forbidden"}',
+                                mimetype="application/json", status=403)
+
+            payload = freq.get_json(silent=True) or {}
+            host = str(payload.get("host", "")).strip().lower()[:253]
+            level = str(payload.get("level", "")).strip().lower()
+            if not host or level not in site_priority.LEVELS:
+                return Response('{"ok":false,"error":"bad_request"}',
+                                mimetype="application/json", status=400)
+            if not site_priority.set_level(host, level):
+                return Response('{"ok":false,"error":"write_failed"}',
+                                mimetype="application/json", status=500)
+            return Response(json.dumps({"ok": True, "host": host, "level": level}),
+                            mimetype="application/json")
+
         # ── Script injection ─────────────────────────────────────────────
         @app.after_request
         def inject_card_script(response):
@@ -324,7 +473,11 @@ class SXNGPlugin(Plugin):
                 return response
             try:
                 body = response.get_data(as_text=True)
-                if 'id="results"' not in body and "id='results'" not in body:
+                # Results pages carry id="results"; the home page carries
+                # class="index". The frontend needs both so the Lens dropdown
+                # (below the search bar) shows before the first search too.
+                if ('id="results"' not in body and "id='results'" not in body
+                        and 'class="index"' not in body):
                     return response
                 _v = str(int(time.time() // 60))
                 # Hand the client the Reddit privacy-frontend host(s) so it can
