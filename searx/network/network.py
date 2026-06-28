@@ -355,22 +355,37 @@ def _get_fallback_proxies() -> str | dict[str, str] | None:
     return f"{scheme}://{netloc}"
 
 
-def _clone_network_with_proxies(net: "Network", proxies: str | dict[str, str], logger_name: str) -> "Network":
+def _clone_network_with_proxies(
+    net: "Network",
+    proxies: str | dict[str, str],
+    logger_name: str,
+    *,
+    keepalive: bool,
+    keepalive_expiry: float = 0.0,
+) -> "Network":
     """A twin of ``net`` with the same parameters but routed through ``proxies``.
 
-    Keep-alive is disabled (``max_keepalive_connections=0``): a rotating
-    residential proxy assigns the upstream IP per *connection*, so reusing a
-    pooled tunnel would pin one IP and defeat rotation.  Forcing a fresh
-    connection per request lets each retry land on a new exit IP -- which is the
-    whole point of falling back to the proxy after a block.
+    Two twins are built per engine (see :py:func:`initialize`):
+
+    * **sticky** (``keepalive=True``) -- connections are pooled, so once we have
+      landed on a working residential exit IP, subsequent searches reuse that
+      tunnel instead of paying a fresh TLS + proxy handshake every time.  This
+      is the fast steady-state path used while the direct IP is known-blocked
+      (see ``_prefer_proxy_until`` in the online processor).
+
+    * **rotating** (``keepalive=False``, ``max_keepalive_connections=0``) -- a
+      fresh connection per request.  A rotating residential proxy assigns the
+      upstream IP per *connection*, so this lets each retry land on a new exit
+      IP -- which is how :py:meth:`OnlineProcessor._retry_via_proxy` escapes a
+      blocked IP after a captcha.
     """
     return Network(
         enable_http=net.enable_http,
         verify=net.verify,
         enable_http2=net.enable_http2,
         max_connections=net.max_connections,
-        max_keepalive_connections=0,
-        keepalive_expiry=0.0,
+        max_keepalive_connections=net.max_keepalive_connections if keepalive else 0,
+        keepalive_expiry=keepalive_expiry if keepalive else 0.0,
         proxies=proxies,
         using_tor_proxy=False,
         local_addresses=net.local_addresses,
@@ -485,25 +500,40 @@ def initialize(
         image_proxy_params['enable_http2'] = False
         NETWORKS['image_proxy'] = new_network(image_proxy_params, logger_name='image_proxy')
 
-    # Fallback proxy twins: for every network build a "<name>__proxy" sibling that
-    # routes through the fallback proxy.  An engine is switched to its twin only
-    # after it is blocked (captcha / HTTP 429) on the direct IP -- see the online
-    # processor (searx/search/processors/online.py).  Networks shared by several
-    # engines (references) share a single twin.
+    # Fallback proxy twins: for every network build two siblings that route
+    # through the fallback proxy -- a sticky "<name>__proxy" (keep-alive, reuses
+    # the working tunnel = fast) and a rotating "<name>__proxy_rot" (fresh
+    # connection per request = new exit IP per retry).  An engine is switched to
+    # a twin only after it is blocked (captcha / HTTP 429) on the direct IP --
+    # see the online processor (searx/search/processors/online.py).  Networks
+    # shared by several engines (references) share a single pair of twins.
     fallback_proxies = _get_fallback_proxies()
     if fallback_proxies:
-        proxy_twins: dict[int, Network] = {}
+        # Keep the sticky tunnel alive across the whole prefer-proxy window so
+        # consecutive searches reuse it instead of redialing the proxy.
+        sticky_expiry = float(settings['search'].get('max_ban_time_on_fail', 120))
+        sticky_twins: dict[int, Network] = {}
+        rotate_twins: dict[int, Network] = {}
         for net_name, net in list(NETWORKS.items()):
-            if net_name.endswith('__proxy'):
+            if net_name.endswith('__proxy') or net_name.endswith('__proxy_rot'):
                 continue
-            twin = proxy_twins.get(id(net))
-            if twin is None:
-                twin = _clone_network_with_proxies(net, fallback_proxies, f"{net_name}__proxy")
-                proxy_twins[id(net)] = twin
-            NETWORKS[f"{net_name}__proxy"] = twin
+            sticky = sticky_twins.get(id(net))
+            if sticky is None:
+                sticky = _clone_network_with_proxies(
+                    net, fallback_proxies, f"{net_name}__proxy", keepalive=True, keepalive_expiry=sticky_expiry
+                )
+                sticky_twins[id(net)] = sticky
+            NETWORKS[f"{net_name}__proxy"] = sticky
+            rotate = rotate_twins.get(id(net))
+            if rotate is None:
+                rotate = _clone_network_with_proxies(
+                    net, fallback_proxies, f"{net_name}__proxy_rot", keepalive=False
+                )
+                rotate_twins[id(net)] = rotate
+            NETWORKS[f"{net_name}__proxy_rot"] = rotate
         # logged at WARNING so it is visible at the production log level: a
         # one-time, boot-time confirmation that the fallback proxy is armed.
-        logger.warning("fallback proxy enabled (%d networks have a proxy twin)", len(proxy_twins))
+        logger.warning("fallback proxy enabled (%d networks have proxy twins)", len(sticky_twins))
 
 
 @atexit.register

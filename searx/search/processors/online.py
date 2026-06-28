@@ -127,9 +127,17 @@ class OnlineProcessor(EngineProcessor):
         self._prefer_proxy_until: float = 0.0
 
     def _proxy_network_name(self) -> str | None:
-        """Name of this engine's fallback-proxy twin network, or ``None`` if no
-        fallback proxy is configured (see searx/network/network.py)."""
+        """Name of this engine's *sticky* fallback-proxy twin (keep-alive: reuses
+        the working tunnel across searches = fast), or ``None`` if no fallback
+        proxy is configured (see searx/network/network.py)."""
         name = f"{self.engine.name}__proxy"
+        return name if searx.network.get_network(name) is not None else None
+
+    def _proxy_rotate_network_name(self) -> str | None:
+        """Name of this engine's *rotating* fallback-proxy twin (fresh connection
+        per request = new exit IP per retry), used by :py:meth:`_retry_via_proxy`
+        to escape a blocked IP.  ``None`` if no fallback proxy is configured."""
+        name = f"{self.engine.name}__proxy_rot"
         return name if searx.network.get_network(name) is not None else None
 
     def _retry_via_proxy(
@@ -145,12 +153,14 @@ class OnlineProcessor(EngineProcessor):
         direct IP.  Returns ``True`` as soon as one attempt goes through (results
         added to the container), ``False`` if every attempt is blocked too.
 
-        The proxy twin disables keep-alive (see network.py), so each attempt
-        opens a fresh tunnel and the rotating residential pool hands back a new
-        exit IP -- retrying a few times makes it very likely to land on an IP the
-        engine hasn't rate-limited.  ``params`` is the pristine (pre-request)
-        snapshot; it is deep-copied per attempt because ``engine.request()``
-        mutates it.
+        ``proxy_name`` is the *rotating* twin (keep-alive disabled, see
+        network.py), so each attempt opens a fresh tunnel and the rotating
+        residential pool hands back a new exit IP -- retrying a few times makes
+        it very likely to land on an IP the engine hasn't rate-limited.  On
+        success the cooldown (``_prefer_proxy_until``) then routes following
+        searches through the sticky keep-alive twin.  ``params`` is the pristine
+        (pre-request) snapshot; it is deep-copied per attempt because
+        ``engine.request()`` mutates it.
         """
         searx.network.set_context_network_name(proxy_name)
         attempts = max(1, int(get_setting("search.proxy_fallback_attempts")))
@@ -323,8 +333,12 @@ class OnlineProcessor(EngineProcessor):
         prefer_proxy = proxy_name is not None and default_timer() < self._prefer_proxy_until
         if prefer_proxy:
             searx.network.set_context_network_name(proxy_name)  # type: ignore[arg-type]
-        # engine.request() mutates params, so snapshot it for a possible retry.
-        retry_params = copy.deepcopy(params) if (proxy_name is not None and not prefer_proxy) else None
+        # engine.request() mutates params, so snapshot the pristine params for a
+        # possible retry.  Taken whenever a proxy twin exists -- including in
+        # prefer_proxy mode, so a sticky exit IP that turns out to be blocked
+        # (residential IPs get 429'd often) can re-rotate instead of suspending
+        # the engine for minutes.
+        retry_params = copy.deepcopy(params) if proxy_name is not None else None
 
         try:
             # send requests and parse the results
@@ -355,11 +369,14 @@ class OnlineProcessor(EngineProcessor):
             SearxEngineTooManyRequestsException,
             SearxEngineAccessDeniedException,
         ) as e:
-            # Blocked on the direct IP: re-query once through the fallback proxy
-            # before giving up (only if a proxy twin exists and we weren't
-            # already on it).
-            if retry_params is not None and self._retry_via_proxy(
-                proxy_name,  # type: ignore[arg-type]
+            # Blocked (on the direct IP, or on a now-stale sticky exit IP):
+            # re-query through the fallback proxy before giving up.  Retries go
+            # through the *rotating* twin so each attempt lands on a fresh exit
+            # IP; once one succeeds, the cooldown routes subsequent searches
+            # through the *sticky* (keep-alive) twin.
+            rotate_name = self._proxy_rotate_network_name()
+            if retry_params is not None and rotate_name is not None and self._retry_via_proxy(
+                rotate_name,
                 query,
                 retry_params,
                 result_container,
