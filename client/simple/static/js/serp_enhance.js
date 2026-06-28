@@ -203,6 +203,28 @@
     }
     .theme-dark .serp-game-store, .theme-dark .serp-game-price { color:#dcdcdc; }
 
+    /* "Maps" box — deep-links a local/place query to Apple Maps */
+    .serp-src-maps .serp-src-head { color:#1a73e8; flex-wrap:wrap; }
+    .serp-maps-head-title { color:inherit; text-decoration:none; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .serp-maps-head-title:hover { text-decoration:underline; }
+    .serp-maps-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+    .serp-maps-btn {
+      display:inline-flex; align-items:center; gap:6px; text-decoration:none;
+      font-size:0.8rem; font-weight:600; line-height:1; padding:8px 12px;
+      border-radius:8px; border:1px solid rgba(26,115,232,0.35);
+      color:#1a73e8; background:rgba(26,115,232,0.06); white-space:nowrap;
+    }
+    .serp-maps-btn svg { width:15px; height:15px; }
+    .serp-maps-btn:hover { background:rgba(26,115,232,0.14); }
+    .serp-maps-btn.primary { color:#fff; background:#1a73e8; border-color:#1a73e8; }
+    .serp-maps-btn.primary:hover { background:#1666d0; }
+    @media (prefers-color-scheme: dark) {
+      .serp-maps-btn { color:#8ab4f8; border-color:rgba(138,180,248,0.4); background:rgba(138,180,248,0.08); }
+      .serp-maps-btn.primary { color:#fff; background:#1a73e8; }
+    }
+    .theme-dark .serp-maps-btn { color:#8ab4f8; border-color:rgba(138,180,248,0.4); background:rgba(138,180,248,0.08); }
+    .theme-dark .serp-maps-btn.primary { color:#fff; background:#1a73e8; }
+
     /* Currency converter card (currency-conversion queries) */
     #serp-currency {
       border:1px solid rgba(127,127,127,0.22); border-radius:14px;
@@ -285,6 +307,8 @@
     comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
     watch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/><rect x="2" y="4" width="20" height="15" rx="2.5"/><line x1="8" y1="22" x2="16" y2="22"/></svg>',
     game: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><rect x="2" y="6" width="20" height="12" rx="4"/></svg>',
+    maps: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+    directions: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>',
   };
 
   function fmtNum(n) {
@@ -858,6 +882,77 @@
       .catch(drop);
   }
 
+  // ── "Maps" box (local / place-finder queries) ─────────────────────────────
+  // A pure deep-link card: no API call, no token. A local-intent query ("X near
+  // me", "directions to Y", "theme park nearby") hands off to Apple Maps, which
+  // supplies the live map, ratings and turn-by-turn directions from the user's
+  // own location. maps.apple.com renders in any browser and opens the Maps app
+  // on Apple devices.
+
+  // Strong locality cues — any one of these alone triggers the box.
+  const MAPS_CUE_RE = /\bnear\s*(?:me|by|here)\b|\bnearby\b|\baround\s+me\b|\bclose\s+(?:to\s+me|by)\b|\b(?:closest|nearest)\b|\bin\s+my\s+area\b|\bwalking\s+distance\b|\bdirections?\s+(?:to|from)\b|\bget\s+directions\b|\bhow\s+(?:do\s+i|to)\s+get\s+to\b|\bmap\s+of\b|\bon\s+the\s+map\b|\bwhere\s+is\b/i;
+
+  // Place-type nouns — only count when paired with a "near/around/closest" cue,
+  // so "italian restaurant near me" lights up but "restaurant pos software" or
+  // "italian recipes" don't.
+  const PLACE_TYPE_RE = /\b(?:restaurants?|caf[eé]s?|coffee\s+shops?|bars?|pubs?|hotels?|motels?|hostels?|gas\s+stations?|petrol\s+stations?|pharmac(?:y|ies)|hospitals?|clinics?|atms?|banks?|supermarkets?|grocer(?:y|ies)|theme\s+parks?|amusement\s+parks?|water\s+parks?|zoos?|aquariums?|museums?|gyms?|cinemas?|movie\s+theat(?:er|re)s?|airports?|train\s+stations?|bus\s+stations?|parking|mechanics?|dentists?|doctors?|vets?|veterinarians?|salons?|barbers?|plumbers?|electricians?|stores?|shops?|malls?|markets?|baker(?:y|ies)|takeaway|takeout|diner)\b/i;
+
+  const NEAR_PREP_RE = /\b(?:near|nearby|around|close|closest|nearest)\b/i;
+
+  function mapsIntent(q) {
+    if (!q) return false;
+    if (MAPS_CUE_RE.test(q)) return true;
+    if (PLACE_TYPE_RE.test(q) && NEAR_PREP_RE.test(q)) return true;
+    return false;
+  }
+
+  // Insert (once) a Maps box at the top of the sources wrap. Synchronous — the
+  // deep links are built from the query, so there's nothing to fetch or drop.
+  let _mapsAttempted = false;
+  function ensureMapsBox(wrap, newTab) {
+    if (_mapsAttempted || document.getElementById("serp-maps")) return;
+    const query = currentQuery();
+    if (!query) return;
+    _mapsAttempted = true;
+
+    const enc = encodeURIComponent(query);
+    const searchUrl = "https://maps.apple.com/?q=" + enc;
+    const dirUrl = "https://maps.apple.com/?daddr=" + enc + "&dirflg=d";
+
+    const box = document.createElement("div");
+    box.id = "serp-maps";
+    box.className = "serp-src-group serp-src-maps";
+    box.innerHTML =
+      '<div class="serp-src-head">' + ICON.maps + "<span>" + _("Maps") + " · </span></div>" +
+      '<div class="serp-maps-actions"></div>';
+
+    function link(el, href) {
+      el.href = href;
+      if (newTab) { el.target = "_blank"; el.rel = "noopener noreferrer"; } else el.rel = "noopener";
+    }
+
+    // The searched place itself links through to the Apple Maps results.
+    const head = box.querySelector(".serp-src-head");
+    const titleA = document.createElement("a");
+    titleA.className = "serp-maps-head-title";
+    titleA.textContent = query;
+    link(titleA, searchUrl);
+    head.appendChild(titleA);
+
+    const actions = box.querySelector(".serp-maps-actions");
+    function btn(label, href, icon, primary) {
+      const a = document.createElement("a");
+      a.className = "serp-maps-btn" + (primary ? " primary" : "");
+      a.innerHTML = icon + "<span>" + esc(label) + "</span>";
+      link(a, href);
+      return a;
+    }
+    actions.appendChild(btn(_("Open in Apple Maps"), searchUrl, ICON.maps, true));
+    actions.appendChild(btn(_("Directions"), dirUrl, ICON.directions, false));
+
+    wrap.insertBefore(box, wrap.firstChild);  // top of the sources column
+  }
+
   // ── Currency converter card (currency-conversion queries) ──────────────────
   // Detection vocabulary kept in sync with ai_summary.js (which suppresses its
   // box for these queries) and the server-side currency_box.py resolver.
@@ -1098,13 +1193,14 @@
     const intent = queryIntent();
     const wantWatch = intent ? intent === "watch" : hasEntHost();
     const wantGame = intent ? intent === "game" : hasGameHost();
+    const wantMaps = mapsIntent(currentQuery());
 
     let wrap = document.getElementById("serp-sources");
     if (!wrap) {
       const items = collectMatches();
       const reddit = items.filter((it) => it.kind === "reddit");
       const github = items.filter((it) => it.kind === "github");
-      if (!reddit.length && !github.length && !wantWatch && !wantGame) return;
+      if (!reddit.length && !github.length && !wantWatch && !wantGame && !wantMaps) return;
 
       wrap = document.createElement("div");
       wrap.id = "serp-sources";
@@ -1125,6 +1221,8 @@
     // both, "where to watch" ends up on top.
     if (wantGame) ensureGameBox(wrap, newTab);
     if (wantWatch) ensureWatchBox(wrap, newTab);
+    // Maps box last → it lands at the very top for local "near me" queries.
+    if (wantMaps) ensureMapsBox(wrap, newTab);
   }
 
   // ── 3. Copy-summary button on the AI summary block ─────────────────────────
