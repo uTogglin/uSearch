@@ -74,6 +74,12 @@ server:
   secret_key: "ultrasecretkey" # overwritten by $SEARXNG_SECRET / entrypoint
   image_proxy: false
   limiter: false
+  # Public URL of the instance (the Cloudflare front, not the Fly origin). Without
+  # this, _external=True redirects — notably saving preferences (webapp.py) — are
+  # built from the Host that Flask sees, which leaks the Fly origin and sends the
+  # browser to a domain that has no IPv4 (so it's unreachable for v4-only clients).
+  # Pinning it here forces every absolute link/redirect through the Cloudflare edge.
+  base_url: "https://search.utoggl.in"
 
 outgoing:
   # Slower engines (and the shared CPU) need more than the 3s default, or they
@@ -83,3 +89,11 @@ outgoing:
 
 ui:
   infinite_scroll: false
+
+# Privacy-frontend redirects (searx/plugins/privacy_redirect.py). An empty value
+# disables the redirect for that one service and lets the real site through.
+privacy_redirect:
+  # wikiless.org (and the wider Wikiless project) is defunct — its instances are
+  # offline, so Wikipedia results were redirecting to a dead host. Wikipedia is
+  # already ad-free and trackerless, so send results straight there instead.
+  wikiless: ""

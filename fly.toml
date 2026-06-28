@@ -14,6 +14,16 @@ primary_region = "iad"
 [build]
   dockerfile = "container/fly.dockerfile"
 
+[env]
+  # Public URL of the instance (the Cloudflare front, NOT the Fly origin).
+  # Overrides server.base_url at load time, so _external=True redirects — notably
+  # saving preferences — point at Cloudflare. Set here (env, not the settings
+  # template) because the config dir persists across deploys: the entrypoint only
+  # writes settings.yml when it's missing, so template edits never reach the live
+  # file, whereas SEARXNG_BASE_URL is applied on every boot. v4-only clients can't
+  # reach *.fly.dev, so a leaked origin redirect is a dead end for them.
+  SEARXNG_BASE_URL = "https://search.utoggl.in"
+
 # Persistent volume for the favicon cache (SQLite). Mounted at the SearXNG data
 # path so resolved favicons survive deploys and scale-to-zero cold boots instead
 # of starting from an empty /tmp every time. The entrypoint chowns it to the
