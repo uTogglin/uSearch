@@ -533,6 +533,53 @@
     .theme-dark .serp-lens-name, .theme-dark .serp-lens-sites { color:#e8e8e8; background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.18); }
     .theme-dark .serp-lens-btn { color:#cfcfcf; }
     .theme-dark .serp-lens-menu, .theme-dark .serp-lens-edit { border-color:rgba(255,255,255,0.14); }
+
+    /* Device-sync — home-page entry link + modal (reuses .serp-modal shell) */
+    .serp-sync-home { text-align:center; margin:14px auto 0; }
+    .serp-sync-link {
+      display:inline-flex; align-items:center; gap:6px; background:transparent; border:none; cursor:pointer;
+      color:#8a8a8a; font:inherit; font-size:0.82rem; padding:4px 6px; border-radius:8px;
+    }
+    .serp-sync-link:hover { color:#1f6feb; }
+    .serp-sync-link svg { width:14px; height:14px; }
+    .serp-sync-modal { max-width:440px; }
+    .serp-sync-headic { display:inline-flex; align-items:center; justify-content:center; padding:3px; color:#1f6feb; }
+    .serp-sync-headic svg { width:16px; height:16px; }
+    .serp-sync-sec { padding:14px 0; }
+    .serp-sync-sec + .serp-sync-sec { border-top:1px solid rgba(127,127,127,0.16); }
+    .serp-sync-sec h3 { font-size:0.86rem; font-weight:600; margin:0 0 4px; }
+    .serp-sync-sec p { font-size:0.78rem; color:#8a8a8a; margin:0 0 10px; line-height:1.5; }
+    .serp-sync-btn {
+      width:100%; box-sizing:border-box; background:#1f6feb; border:1px solid #1f6feb; border-radius:10px;
+      color:#fff; font:inherit; font-size:0.86rem; font-weight:600; padding:9px; cursor:pointer;
+    }
+    .serp-sync-btn:hover { filter:brightness(1.06); }
+    .serp-sync-btn:disabled { opacity:0.6; cursor:default; filter:none; }
+    .serp-sync-codebox { display:flex; gap:8px; align-items:center; margin-top:4px; }
+    .serp-sync-code {
+      flex:1 1 auto; min-width:0; text-align:center; letter-spacing:0.16em;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:1.25rem; font-weight:700;
+      padding:10px 8px; border:1px solid rgba(127,127,127,0.28); border-radius:10px;
+      background:rgba(127,127,127,0.06); color:var(--color-base-font,#202124); user-select:all;
+    }
+    .serp-sync-copy {
+      flex-shrink:0; width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center;
+      background:transparent; border:1px solid rgba(127,127,127,0.28); border-radius:10px; color:#9aa0a6; cursor:pointer;
+    }
+    .serp-sync-copy:hover { color:#1f6feb; border-color:rgba(31,111,235,0.5); }
+    .serp-sync-copy svg { width:16px; height:16px; }
+    .serp-sync-input {
+      width:100%; box-sizing:border-box; text-align:center; text-transform:uppercase; letter-spacing:0.14em;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:1.05rem; font-weight:600;
+      padding:10px; margin-bottom:9px; border:1px solid rgba(127,127,127,0.28); border-radius:10px;
+      background:var(--color-base-background,#fff); color:var(--color-base-font,#202124);
+    }
+    .serp-sync-note { font-size:0.74rem; color:#8a8a8a; margin:10px 2px 0; line-height:1.5; display:flex; gap:6px; align-items:flex-start; }
+    .serp-sync-note svg { width:13px; height:13px; flex-shrink:0; margin-top:2px; }
+    .serp-sync-msg { font-size:0.78rem; margin:9px 2px 0; line-height:1.5; min-height:1em; }
+    .serp-sync-msg.err { color:#c0392b; }
+    .serp-sync-msg.ok { color:#1e8e3e; }
+    .theme-dark .serp-sync-code, .theme-dark .serp-sync-input { color:#e8e8e8; background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.18); }
   `;
 
   function injectStyles() {
@@ -2331,6 +2378,211 @@
     refreshLensBtn();
   }
 
+  // ── Device sync (cross-device settings transfer via a one-time code) ─────────
+  // A short code parks the visitor's settings on THIS instance for a single
+  // restore. What travels: SearXNG preferences (read server-side from the
+  // requester's cookies), this browser's Lenses + site priorities, and the bang
+  // mode. The admin token is deliberately never included. Codes are one-time,
+  // expire in ~30 min, and are never tied to a search. Home page only.
+
+  const BANG_COOKIE = "featured_bang_mode";
+  const SYNC_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+
+  function getCookie(name) {
+    const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+  function setCookie(name, value, days) {
+    const exp = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = name + "=" + encodeURIComponent(value) + "; Expires=" + exp + "; Path=/; SameSite=Lax";
+  }
+
+  // Everything this browser would send up. The SearXNG prefs hash is added by
+  // the server from the requester's own cookies — never trusted from here.
+  function collectSyncBundle() {
+    return {
+      lenses: loadLenses(),
+      sitePriority: loadPrio(),
+      bangMode: getCookie(BANG_COOKIE),
+    };
+  }
+
+  // Write a restored bundle into this browser, then hand off to /preferences so
+  // the server sets the SearXNG cookies and lands us back home with it applied.
+  function applySyncBundle(data) {
+    try {
+      if (data.lenses && typeof data.lenses === "object" && Array.isArray(data.lenses.lenses)) {
+        localStorage.setItem(LENS_KEY, JSON.stringify(data.lenses));
+      }
+    } catch (_) { /* ignore */ }
+    try {
+      if (data.sitePriority && typeof data.sitePriority === "object" && !Array.isArray(data.sitePriority)) {
+        localStorage.setItem(PRIO_KEY, JSON.stringify(data.sitePriority));
+      }
+    } catch (_) { /* ignore */ }
+    if (typeof data.bangMode === "string" && data.bangMode) setCookie(BANG_COOKIE, data.bangMode, 365);
+
+    const prefs = typeof data.prefs === "string" ? data.prefs : "";
+    window.location.href = prefs ? "/preferences?preferences=" + encodeURIComponent(prefs) : "/";
+  }
+
+  // Discreet "sync settings" link under the search box on the home page.
+  function buildSyncUI() {
+    if (!document.querySelector(".index")) return;          // home page only
+    if (document.getElementById("serp-sync-home")) return;  // idempotent
+    const form = document.getElementById("search");
+    if (!form || !form.parentNode) return;
+    const wrap = document.createElement("div");
+    wrap.id = "serp-sync-home";
+    wrap.className = "serp-sync-home";
+    wrap.innerHTML =
+      '<button type="button" class="serp-sync-link">' + SYNC_ICON +
+        "<span>" + _("Sync settings to another device") + "</span></button>";
+    form.parentNode.insertBefore(wrap, form.nextSibling);
+    wrap.querySelector(".serp-sync-link").addEventListener("click", openSyncModal);
+  }
+
+  function openSyncModal() {
+    closePanel();
+    const back = document.createElement("div");
+    back.id = "serp-modal-backdrop";
+    back.className = "serp-modal-backdrop";
+    back.innerHTML =
+      '<div class="serp-modal serp-sync-modal" role="dialog" aria-modal="true">' +
+        '<div class="serp-modal-head">' +
+          '<span class="serp-modal-fav serp-sync-headic">' + SYNC_ICON + "</span>" +
+          '<div class="serp-modal-titles">' +
+            '<p class="serp-modal-title">' + _("Sync settings") + "</p>" +
+            '<div class="serp-modal-host">' + _("Move your settings to another device") + "</div>" +
+          "</div>" +
+          '<button type="button" class="serp-modal-close" aria-label="Close">' + ICON.close + "</button>" +
+        "</div>" +
+        '<div class="serp-modal-body">' +
+          '<div class="serp-sync-sec">' +
+            "<h3>" + _("Get a code") + "</h3>" +
+            "<p>" + _("Generate a code here, then enter it on your other device.") + "</p>" +
+            '<button type="button" class="serp-sync-btn serp-sync-gen">' + _("Generate code") + "</button>" +
+            '<div class="serp-sync-result" hidden>' +
+              '<div class="serp-sync-codebox">' +
+                '<div class="serp-sync-code"></div>' +
+                '<button type="button" class="serp-sync-copy" aria-label="' + esc(_("Copy")) + '">' + ICON.copy + "</button>" +
+              "</div>" +
+              '<div class="serp-sync-note">' + ICON.lock +
+                "<span>" + _("Works once, expires in 30 minutes, and is never linked to your searches.") + "</span></div>" +
+            "</div>" +
+            '<div class="serp-sync-msg get-msg"></div>' +
+          "</div>" +
+          '<div class="serp-sync-sec">' +
+            "<h3>" + _("Enter a code") + "</h3>" +
+            "<p>" + _("Restore a code from another device. This replaces this browser's settings.") + "</p>" +
+            '<input class="serp-sync-input" type="text" autocomplete="off" spellcheck="false" placeholder="XXX-XXX-XXX" maxlength="13">' +
+            '<button type="button" class="serp-sync-btn serp-sync-restore">' + _("Restore settings") + "</button>" +
+            '<div class="serp-sync-msg enter-msg"></div>' +
+          "</div>" +
+        "</div>" +
+      "</div>";
+    document.body.appendChild(back);
+    back.addEventListener("click", (e) => { if (e.target === back) closePanel(); });
+    back.querySelector(".serp-modal-close").addEventListener("click", closePanel);
+    _panelEsc = (e) => { if (e.key === "Escape") closePanel(); };
+    document.addEventListener("keydown", _panelEsc);
+
+    wireSyncGet(back);
+    wireSyncEnter(back);
+  }
+
+  function wireSyncGet(back) {
+    const gen = back.querySelector(".serp-sync-gen");
+    const result = back.querySelector(".serp-sync-result");
+    const codeEl = back.querySelector(".serp-sync-code");
+    const msg = back.querySelector(".get-msg");
+
+    gen.addEventListener("click", async () => {
+      gen.disabled = true;
+      msg.className = "serp-sync-msg get-msg";
+      msg.textContent = _("Generating…");
+      try {
+        const r = await fetch("/sync/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(collectSyncBundle()),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.ok) throw new Error(data.error || "failed");
+        codeEl.textContent = data.code;
+        result.hidden = false;
+        gen.hidden = true;
+        msg.textContent = "";
+      } catch (_) {
+        msg.classList.add("err");
+        msg.textContent = _("Couldn’t generate a code. Please try again.");
+        gen.disabled = false;
+      }
+    });
+
+    back.querySelector(".serp-sync-copy").addEventListener("click", async function () {
+      const text = codeEl.textContent;
+      try {
+        if (window.isSecureContext && navigator.clipboard) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(codeEl);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          document.execCommand("copy");
+        }
+        this.innerHTML = ICON.check;
+        setTimeout(() => { this.innerHTML = ICON.copy; }, 1400);
+      } catch (_) { /* ignore */ }
+    });
+  }
+
+  function wireSyncEnter(back) {
+    const input = back.querySelector(".serp-sync-input");
+    const btn = back.querySelector(".serp-sync-restore");
+    const msg = back.querySelector(".enter-msg");
+
+    // Re-group as the user types (display only; submit strips the dashes).
+    input.addEventListener("input", () => {
+      const raw = input.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 9);
+      input.value = raw.replace(/(.{3})(?=.)/g, "$1-");
+    });
+
+    const submit = async () => {
+      const code = input.value.replace(/[^0-9A-Za-z]/g, "");
+      if (code.length < 9) {
+        msg.className = "serp-sync-msg enter-msg err";
+        msg.textContent = _("Enter the full code.");
+        return;
+      }
+      btn.disabled = true;
+      msg.className = "serp-sync-msg enter-msg";
+      msg.textContent = _("Restoring…");
+      try {
+        const r = await fetch("/sync/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: code }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.ok) throw new Error(data.error || "failed");
+        msg.classList.add("ok");
+        msg.textContent = _("Restored. Applying…");
+        applySyncBundle(data);  // navigates away
+      } catch (e) {
+        msg.classList.add("err");
+        msg.textContent = (e && e.message === "invalid_or_expired")
+          ? _("That code is invalid or has expired.")
+          : _("Couldn’t restore. Please try again.");
+        btn.disabled = false;
+      }
+    };
+    btn.addEventListener("click", submit);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } });
+  }
+
   // ── Orchestration ──────────────────────────────────────────────────────────
 
   function enhanceAll() {
@@ -2349,6 +2601,8 @@
     // The lens dropdown lives below the search bar, so it must init even on the
     // home page where there are no results yet.
     buildLensUI();
+    // The "sync settings" entry point is home-page only (gated inside).
+    buildSyncUI();
     if (!document.getElementById("results") && !document.querySelector(".result")) return;
     enhanceAll();
 

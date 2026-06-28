@@ -292,6 +292,9 @@ plugins:
   searx.plugins.currency_box.SXNGPlugin:
     active: true
 
+  searx.plugins.device_sync.SXNGPlugin:
+    active: true
+
 
 # Configuration of the "Privacy redirect plugin":
 #
@@ -357,6 +360,21 @@ card_meta:
 # survives deploys; falls back to the temp dir if the path isn't writable.
 site_priority:
   path: "/var/cache/searxng/site_priorities.json"
+
+
+# Device Sync (POST /sync/create + /sync/restore): one-time, short-lived codes
+# that move a visitor's settings to another device. The parked bundle holds only
+# settings (SearXNG prefs hash + this fork's Lenses / site priorities / bang
+# mode) and an expiry — never an IP, User-Agent, or anything identifying — and is
+# deleted the moment it's restored. Persisted on the Fly volume so it survives a
+# scale-to-zero resume and is shared across workers; temp-dir fallback otherwise.
+sync_code:
+  path: "/var/cache/searxng/sync_codes.json"
+  ttl: 1800                 # a generated code stays valid 30 min if unused
+  max_codes: 5000           # cap on simultaneously-parked codes
+  max_bytes: 65536          # reject bundles larger than this (base64 chars)
+  rate_limit_capacity: 12   # per-IP burst size (create + restore)
+  rate_limit_rate: 0.2      # per-IP tokens refilled per second
 
 
 # Configuration of the "Watch Offers plugin" ("Where to watch" box):
