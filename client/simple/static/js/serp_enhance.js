@@ -472,11 +472,14 @@
     .serp-lens-ic { display:inline-flex; } .serp-lens-ic svg { width:14px; height:14px; }
     .serp-lens-caret svg { width:13px; height:13px; opacity:0.7; }
     .serp-lens-cur { font-weight:600; white-space:nowrap; }
+    /* Fixed (not absolute): the filter row is an overflow-x:auto scroll box,
+       which also clips overflow-y — an absolute menu would be hidden by it.
+       Fixed positioning escapes that; coordinates are set on open. */
     .serp-lens-menu {
-      position:absolute; top:calc(100% + 6px); left:0; z-index:9998; min-width:210px;
+      position:fixed; z-index:9998; min-width:210px; max-width:min(280px,92vw);
       background:var(--color-base-background,#fff); border:1px solid rgba(127,127,127,0.22);
       border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,0.22); padding:6px;
-      animation:serp-fade .1s ease;
+      animation:serp-fade .1s ease; max-height:70vh; overflow-y:auto;
     }
     .serp-lens-item {
       display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
@@ -2156,12 +2159,18 @@
   }
 
   let _lensDocClick = null;
+  let _lensReflow = null;
   function closeLensMenu() {
     const menu = document.querySelector("#serp-lens .serp-lens-menu");
     const btn = document.querySelector("#serp-lens .serp-lens-btn");
     if (menu) menu.hidden = true;
     if (btn) btn.setAttribute("aria-expanded", "false");
     if (_lensDocClick) { document.removeEventListener("click", _lensDocClick); _lensDocClick = null; }
+    if (_lensReflow) {
+      window.removeEventListener("scroll", _lensReflow, true);
+      window.removeEventListener("resize", _lensReflow);
+      _lensReflow = null;
+    }
   }
 
   function openLensMenu(menu, btn) {
@@ -2181,6 +2190,7 @@
     menu.innerHTML = html;
     menu.hidden = false;
     btn.setAttribute("aria-expanded", "true");
+    positionLensMenu(menu, btn);
 
     menu.querySelectorAll(".serp-lens-item").forEach((it) => {
       it.addEventListener("click", (e) => {
@@ -2193,6 +2203,21 @@
 
     _lensDocClick = (e) => { if (!menu.parentNode.contains(e.target)) closeLensMenu(); };
     setTimeout(() => document.addEventListener("click", _lensDocClick), 0);
+    // Keep the fixed menu glued to the button as the page scrolls/resizes.
+    _lensReflow = () => positionLensMenu(menu, btn);
+    window.addEventListener("scroll", _lensReflow, true);
+    window.addEventListener("resize", _lensReflow);
+  }
+
+  // Anchor the fixed menu under the button, nudged left if it would overflow.
+  function positionLensMenu(menu, btn) {
+    const r = btn.getBoundingClientRect();
+    menu.style.top = Math.round(r.bottom + 6) + "px";
+    const w = menu.offsetWidth || 210;
+    let left = r.left;
+    const max = window.innerWidth - w - 8;
+    if (left > max) left = Math.max(8, max);
+    menu.style.left = Math.round(left) + "px";
   }
 
   function selectLens(id) {
