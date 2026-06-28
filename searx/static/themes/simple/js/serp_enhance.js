@@ -906,15 +906,27 @@
     return false;
   }
 
+  // Strip SearXNG search operators before handing the query to Apple Maps —
+  // otherwise the "More results from this site" link (which appends "site:host")
+  // and any leading !bang leak verbatim into the maps deep link.
+  function cleanMapsQuery(q) {
+    return (q || "")
+      .replace(/\bsite:\S+/gi, " ")        // "… site:example.com" scoping
+      .replace(/(^|\s)![^\s]+/g, " ")       // !bangs (!images, !!g, …)
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   // Insert (once) a Maps box at the top of the sources wrap. Synchronous — the
   // deep links are built from the query, so there's nothing to fetch or drop.
   let _mapsAttempted = false;
   function ensureMapsBox(wrap, newTab) {
     if (_mapsAttempted || document.getElementById("serp-maps")) return;
-    const query = currentQuery();
-    if (!query) return;
+    const rawQuery = currentQuery();
+    if (!rawQuery) return;
     _mapsAttempted = true;
 
+    const query = cleanMapsQuery(rawQuery) || rawQuery;
     const enc = encodeURIComponent(query);
     const searchUrl = "https://maps.apple.com/?q=" + enc;
     const dirUrl = "https://maps.apple.com/?daddr=" + enc + "&dirflg=d";
