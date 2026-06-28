@@ -215,6 +215,13 @@ article[data-vim-selected].category-social {
     margin-left: 0.5rem;
   }
 
+  // The "More results from this site" search icon sits right after the cached
+  // link (which only has a left margin), so give the icon its own left gap or
+  // it collides with the "cached" text.
+  .engines .cache_link + svg {
+    margin-left: 0.5rem;
+  }
+
   .content,
   .stat {
     font-size: 0.9em;
