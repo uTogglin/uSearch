@@ -492,6 +492,11 @@
     .serp-lens-item.active .serp-lens-mode { color:#1f6feb; }
     .serp-lens-divider { height:1px; background:rgba(127,127,127,0.16); margin:5px 6px; }
     .serp-lens-edit-btn { color:#1f6feb; font-weight:600; }
+    .serp-lens-grouplabel {
+      font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
+      color:#9aa0a6; padding:7px 10px 3px; margin-top:2px;
+    }
+    .serp-lens-grouplabel:first-child { margin-top:0; }
 
     /* Lens manager modal (reuses .serp-modal shell) */
     .serp-lens-modal { max-width:480px; }
@@ -533,6 +538,50 @@
     .theme-dark .serp-lens-name, .theme-dark .serp-lens-sites { color:#e8e8e8; background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.18); }
     .theme-dark .serp-lens-btn { color:#cfcfcf; }
     .theme-dark .serp-lens-menu, .theme-dark .serp-lens-edit { border-color:rgba(255,255,255,0.14); }
+
+    /* Per-result "Summarize" button + AI summary modal (reuses .serp-modal shell) */
+    .serp-sum-btn {
+      display:inline-flex; align-items:center; gap:5px;
+      background:transparent; border:1px solid rgba(127,127,127,0.28);
+      border-radius:6px; color:var(--color-base-font,#666);
+      font:inherit; font-size:0.72rem; line-height:1; padding:3px 8px;
+      cursor:pointer; opacity:0.55; transition:opacity .15s,background .15s,border-color .15s,color .15s;
+      vertical-align:middle;
+    }
+    .engines .serp-sum-btn { margin-left:6px; }
+    .result:hover .serp-sum-btn { opacity:0.9; }
+    .serp-sum-btn:hover { opacity:1; background:rgba(161,66,244,0.10); border-color:rgba(161,66,244,0.45); color:#a142f4; }
+    .serp-sum-btn svg { width:12px; height:12px; flex-shrink:0; }
+    .serp-sum-modal { max-width:560px; }
+    .serp-sum-headic {
+      display:inline-flex; align-items:center; justify-content:center; font-size:1rem;
+      background:linear-gradient(135deg,#4285f4,#a142f4);
+      -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    }
+    .serp-sum-body { font-size:0.9rem; line-height:1.65; color:var(--color-base-font,#202124); white-space:pre-wrap; word-break:break-word; min-height:1.4em; }
+    .serp-sum-body .serp-sum-cursor {
+      display:inline-block; width:2px; height:1em; background:#4285f4;
+      margin-left:2px; vertical-align:text-bottom; animation:serp-blink 0.8s step-end infinite;
+    }
+    @keyframes serp-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .serp-sum-loading { display:flex; align-items:center; gap:9px; color:#8a8a8a; font-size:0.85rem; }
+    .serp-sum-spin {
+      width:14px; height:14px; border:2px solid rgba(127,127,127,0.25);
+      border-top-color:#4285f4; border-radius:50%; animation:serp-spin 0.7s linear infinite; flex-shrink:0;
+    }
+    .serp-sum-err { color:#c0392b; font-size:0.84rem; }
+    .serp-sum-foot { margin-top:12px; font-size:0.68rem; color:#9aa0a6; }
+    .theme-dark .serp-sum-btn { color:#cfcfcf; }
+    .theme-dark .serp-sum-body { color:#e8e8e8; }
+
+    /* Home-page entry points — Assistant / Summarize a link */
+    .serp-home-links { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin:10px auto 0; }
+    .serp-home-link {
+      display:inline-flex; align-items:center; gap:6px; background:transparent; border:none; cursor:pointer;
+      color:#8a8a8a; font:inherit; font-size:0.82rem; padding:4px 6px; border-radius:8px; text-decoration:none;
+    }
+    .serp-home-link:hover { color:#1f6feb; }
+    .serp-home-link svg { width:14px; height:14px; }
 
     /* Device-sync — home-page entry link + modal (reuses .serp-modal shell) */
     .serp-sync-home { text-align:center; margin:14px auto 0; }
@@ -580,6 +629,59 @@
     .serp-sync-msg.err { color:#c0392b; }
     .serp-sync-msg.ok { color:#1e8e3e; }
     .theme-dark .serp-sync-code, .theme-dark .serp-sync-input { color:#e8e8e8; background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.18); }
+
+    /* ── Dictionary instant-answer card ───────────────────────────────────── */
+    #serp-dict {
+      border:1px solid rgba(127,127,127,0.22); border-radius:14px;
+      background:rgba(127,127,127,0.04); padding:16px 18px 14px;
+      margin:0 0 16px 0; box-sizing:border-box;
+    }
+    .serp-dict-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin:0 0 10px; }
+    .serp-dict-word { font-size:1.5rem; font-weight:600; line-height:1.1; color:var(--color-base-font,#202124); }
+    .serp-dict-phon { font-size:0.95rem; color:#8a8a8a; }
+    .serp-dict-audio {
+      display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px;
+      border:1px solid rgba(127,127,127,0.3); border-radius:50%; background:transparent;
+      color:#4285f4; cursor:pointer; padding:0;
+    }
+    .serp-dict-audio:hover { background:rgba(66,133,244,0.10); border-color:rgba(66,133,244,0.45); }
+    .serp-dict-audio svg { width:13px; height:13px; }
+    .serp-dict-mean { margin:0 0 10px; }
+    .serp-dict-pos { font-size:0.85rem; font-style:italic; color:#8a8a8a; margin:0 0 4px; }
+    .serp-dict-defs { margin:0; padding:0 0 0 1.3em; }
+    .serp-dict-defs li { font-size:0.92rem; line-height:1.45; color:var(--color-base-font,#202124); margin:0 0 5px; }
+    .serp-dict-eg { display:block; color:#8a8a8a; font-style:italic; margin-top:1px; }
+    .serp-dict-syn { font-size:0.82rem; color:#8a8a8a; margin:2px 0 0; }
+    .serp-dict-syn b { color:var(--color-base-font,#444); font-weight:600; }
+    .serp-dict-src { font-size:0.74rem; color:#8a8a8a; margin:6px 0 0; }
+    .serp-dict-src a { color:#8a8a8a; }
+    .theme-dark .serp-dict-word, .theme-dark .serp-dict-defs li { color:#e8e8e8; }
+    @media (prefers-color-scheme: dark) {
+      .serp-dict-word, .serp-dict-defs li { color:#e8e8e8; }
+    }
+
+    /* Shield tinted by tracker density (only when no manual priority is set, so
+       a user's own block/raise colour always wins). */
+    .serp-shield-btn.trk-mid { color:#e8710a; border-color:rgba(232,113,10,0.45); opacity:0.9; }
+    .serp-shield-btn.trk-hi  { color:#d93025; border-color:rgba(217,48,37,0.5);  opacity:0.95; }
+
+    /* Tracker breakdown inside the shield modal */
+    .serp-trk { margin:14px 0 0; padding:13px 0 0; border-top:1px solid rgba(127,127,127,0.14); }
+    .serp-trk-head { display:flex; align-items:center; gap:10px; }
+    .serp-trk-ic { width:20px; height:20px; flex-shrink:0; color:#9aa0a6; }
+    .serp-trk-ic svg { width:20px; height:20px; }
+    .serp-trk-n { font-size:1.15rem; font-weight:700; line-height:1; }
+    .serp-trk-n.mid { color:#e8710a; } .serp-trk-n.hi { color:#d93025; } .serp-trk-n.lo { color:#1a7f37; }
+    .serp-trk-lbl { font-size:0.86rem; color:#8a8a8a; }
+    .serp-trk-sub { font-size:0.8rem; color:#8a8a8a; margin:8px 0 0; line-height:1.4; }
+    .serp-trk-sub b { color:var(--color-base-font,#444); font-weight:600; }
+    .theme-dark .serp-trk-sub b { color:#e8e8e8; }
+    .serp-trk-names { display:flex; flex-wrap:wrap; gap:5px; margin:7px 0 0; }
+    .serp-trk-chip {
+      font-size:0.74rem; color:#8a8a8a; background:rgba(127,127,127,0.10);
+      border-radius:6px; padding:2px 7px; white-space:nowrap;
+    }
+    .serp-trk-chip.ad { color:#d93025; background:rgba(217,48,37,0.10); }
   `;
 
   function injectStyles() {
@@ -614,6 +716,10 @@
     user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
     starline: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 .59l3.09 6.26 6.91 1-5 4.87 1.18 6.88L12 16.5l-6.18 3.25L7 12.72l-5-4.87 6.91-1z"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>',
+    sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
+    spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>',
+    chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
+    link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
   };
 
   function fmtNum(n) {
@@ -693,6 +799,168 @@
       if (!url) return;
       result.dataset.serpCopy = "1";
       const btn = makeCopyBtn("Copy link", () => resultUrl(result));
+      const engines = result.querySelector(".engines");
+      if (engines) engines.appendChild(btn);
+      else result.appendChild(btn);
+    });
+  }
+
+  // ── 1b. "Summarize" button on each result ──────────────────────────────────
+  // A small button in each result's footer streams an AI summary of THAT result's
+  // URL via GET /ai_summarize?url=… (a text/event-stream, same frame protocol as
+  // the page-level AI summary). Self-contained: a minimal plaintext SSE reader
+  // feeds a modal that reuses the .serp-modal shell.
+
+  // Interpret one SSE payload (text after "data: "). Mirrors ai_summary.js's
+  // handlePayload: "[DONE]" ends the stream; otherwise JSON.parse → string token.
+  function sumHandlePayload(raw, onChunk, onDone) {
+    if (!raw || raw === "[DONE]") {
+      if (raw === "[DONE]") { onDone(); return true; }
+      return false;
+    }
+    try {
+      const txt = JSON.parse(raw);
+      if (typeof txt === "string" && txt) onChunk(txt);
+    } catch (_) {
+      if (raw && raw !== "[DONE]") onChunk(raw);
+    }
+    return false;
+  }
+
+  // Returns the AbortController so the caller can cancel the in-flight stream
+  // (e.g. when the modal is closed) — prevents a leaked fetch + dangling reader.
+  function sumReadStream(url, onChunk, onDone, onError) {
+    const controller = new AbortController();
+    (async () => {
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    try {
+      const resp = await fetch("/ai_summarize?url=" + encodeURIComponent(url), {
+        method: "GET",
+        headers: { Accept: "text/event-stream" },
+        signal: controller.signal,
+      });
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder("utf-8");
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          const t = line.replace(/\r/g, "").trim();
+          if (!t.startsWith("data:")) continue;
+          if (sumHandlePayload(t.slice(5).trim(), onChunk, onDone)) return;
+        }
+      }
+      onDone();
+    } catch (err) {
+      // A deliberate abort (modal closed) is not an error to surface.
+      if (!(err && err.name === "AbortError")) onError(err);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    })();
+    return controller;
+  }
+
+  function openSummaryModal(opts) {
+    closePanel();
+    const back = document.createElement("div");
+    back.id = "serp-modal-backdrop";
+    back.className = "serp-modal-backdrop";
+    back.innerHTML =
+      '<div class="serp-modal serp-sum-modal" role="dialog" aria-modal="true">' +
+        '<div class="serp-modal-head">' +
+          '<span class="serp-modal-fav serp-sum-headic">' + ICON.spark + "</span>" +
+          '<div class="serp-modal-titles">' +
+            '<p class="serp-modal-title"></p>' +
+            '<div class="serp-modal-host"></div>' +
+          "</div>" +
+          '<button type="button" class="serp-modal-close" aria-label="Close">' + ICON.close + "</button>" +
+        "</div>" +
+        '<div class="serp-modal-body">' +
+          '<div class="serp-sum-loading"><span class="serp-sum-spin"></span>' + _("Summarizing…") + "</div>" +
+          '<div class="serp-sum-body" hidden></div>' +
+          '<div class="serp-sum-foot">' + _("AI Summary · may contain inaccuracies") + "</div>" +
+        "</div>" +
+      "</div>";
+    document.body.appendChild(back);
+    back.querySelector(".serp-modal-title").textContent = opts.title || opts.host || _("AI Summary");
+    back.querySelector(".serp-modal-host").textContent = opts.host || "";
+    back.addEventListener("click", (e) => { if (e.target === back) closePanel(); });
+    back.querySelector(".serp-modal-close").addEventListener("click", closePanel);
+    _panelEsc = (e) => { if (e.key === "Escape") closePanel(); };
+    document.addEventListener("keydown", _panelEsc);
+
+    const loading = back.querySelector(".serp-sum-loading");
+    const body = back.querySelector(".serp-sum-body");
+    let text = "", started = false, fromCache = false;
+
+    function ensureStarted() {
+      if (started) return;
+      started = true;
+      if (loading) loading.remove();
+      body.hidden = false;
+    }
+    function render() {
+      body.textContent = text;
+      const cur = document.createElement("span");
+      cur.className = "serp-sum-cursor";
+      body.appendChild(cur);
+    }
+
+    const ctrl = sumReadStream(
+      opts.url,
+      (chunk) => {
+        // Cache hit: sentinel "[CACHED]" frame then one full-text frame.
+        if (chunk === "[CACHED]") { fromCache = true; ensureStarted(); return; }
+        ensureStarted();
+        if (fromCache) { text = chunk; render(); return; }
+        text += chunk;
+        render();
+      },
+      () => {
+        ensureStarted();
+        const cur = body.querySelector(".serp-sum-cursor");
+        if (cur) cur.remove();
+        if (!text.trim()) {
+          body.innerHTML = '<span class="serp-sum-err">' + _("No summary available.") + "</span>";
+        }
+      },
+      () => {
+        if (loading) loading.remove();
+        body.hidden = false;
+        body.innerHTML = '<span class="serp-sum-err">' + _("Could not load summary.") + "</span>";
+      }
+    );
+    // Abort the in-flight stream if the modal is dismissed before it finishes.
+    _panelCleanup = () => { try { ctrl.abort(); } catch (_) { /* ignore */ } };
+  }
+
+  function enhanceSummaries(root) {
+    (root || document).querySelectorAll(".result").forEach((result) => {
+      if (result.dataset.serpSum) return;
+      const url = resultUrl(result);
+      if (!url || !/^https?:\/\//i.test(url)) return;
+      result.dataset.serpSum = "1";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "serp-sum-btn";
+      btn.innerHTML = ICON.spark + "<span>" + _("Summarize") + "</span>";
+      btn.title = _("Summarize this page with AI");
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const a = result.querySelector("h3 a") || result.querySelector("h3");
+        openSummaryModal({
+          url: resultUrl(result),
+          host: hostnameOf(resultUrl(result)),
+          title: a ? a.textContent.trim() : "",
+        });
+      });
       const engines = result.querySelector(".engines");
       if (engines) engines.appendChild(btn);
       else result.appendChild(btn);
@@ -1469,6 +1737,93 @@
     if (answers) answers.style.display = "none";
   }
 
+  // ── Dictionary instant-answer card ─────────────────────────────────────────
+  // Detects "define X" / "X definition" / "what does X mean" style queries and
+  // shows a compact definition card at the top of the results, fetched through
+  // our own /define proxy (the lookup never reaches the dictionary provider).
+
+  const _DICT_PATTERNS = [
+    /^define[:\s]+(.+)$/i,
+    /^definition of\s+(.+)$/i,
+    /^(?:what(?:'s| is| does)?\s+(?:the\s+)?)?meaning of\s+(.+)$/i,
+    /^what does\s+(.+?)\s+mean\b.*$/i,
+    /^(.+?)\s+(?:definition|meaning|defined)$/i,
+  ];
+
+  // Pull the lemma to define out of a query, or null if it isn't a define query.
+  function dictTerm(q) {
+    const s = (q || "").trim();
+    if (!s) return null;
+    for (const re of _DICT_PATTERNS) {
+      const m = re.exec(s);
+      if (m && m[1]) {
+        const term = m[1].trim().replace(/[?."'’]+$/, "").trim();
+        // Real dictionary lemmas: 1–3 words, letters (with internal -/' only).
+        if (/^[a-zA-Z][a-zA-Z'’ -]{0,40}$/.test(term) && term.split(/\s+/).length <= 3) {
+          return term;
+        }
+      }
+    }
+    return null;
+  }
+
+  function renderDict(box, d) {
+    const head =
+      '<div class="serp-dict-head">' +
+        '<span class="serp-dict-word">' + esc(d.word) + "</span>" +
+        (d.phonetic ? '<span class="serp-dict-phon">' + esc(d.phonetic) + "</span>" : "") +
+        (d.audio ? '<button type="button" class="serp-dict-audio" aria-label="Play pronunciation">' + ICON.sound + "</button>" : "") +
+      "</div>";
+    const body = (d.meanings || []).map((m) => {
+      const defs = (m.defs || []).map((def) =>
+        "<li>" + esc(def.def) +
+        (def.example ? '<span class="serp-dict-eg">“' + esc(def.example) + "”</span>" : "") +
+        "</li>").join("");
+      const syn = (m.synonyms && m.synonyms.length)
+        ? '<p class="serp-dict-syn"><b>' + _("Synonyms") + ":</b> " + esc(m.synonyms.join(", ")) + "</p>"
+        : "";
+      return '<div class="serp-dict-mean">' +
+        (m.pos ? '<p class="serp-dict-pos">' + esc(m.pos) + "</p>" : "") +
+        '<ol class="serp-dict-defs">' + defs + "</ol>" + syn +
+      "</div>";
+    }).join("");
+    const src = d.source
+      ? '<p class="serp-dict-src">' + _("Source") + ': <a href="' + esc(d.source) +
+        '" target="_blank" rel="noopener noreferrer">' + esc(d.source.replace(/^https?:\/\//, "")) + "</a></p>"
+      : "";
+    box.innerHTML = head + body + src;
+
+    const audioBtn = box.querySelector(".serp-dict-audio");
+    if (audioBtn && d.audio) {
+      const player = new Audio(d.audio);
+      audioBtn.addEventListener("click", () => { try { player.play(); } catch (_) { /* ignore */ } });
+    }
+  }
+
+  let _dictAttempted = false;
+  function ensureDictionaryBox() {
+    if (_dictAttempted || document.getElementById("serp-dict")) return;
+    const results = document.getElementById("results");
+    if (!results) return;
+    const term = dictTerm(currentQuery());
+    if (!term) return;
+    _dictAttempted = true;
+
+    const box = document.createElement("div");
+    box.id = "serp-dict";
+    box.style.display = "none";
+    results.insertBefore(box, results.firstChild);
+
+    fetch("/define?q=" + encodeURIComponent(term), { headers: { Accept: "application/json" } })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d || d.type !== "define" || !d.meanings || !d.meanings.length) { box.remove(); return; }
+        renderDict(box, d);
+        box.style.display = "";
+      })
+      .catch(() => box.remove());
+  }
+
   // Insert (once) the converter card at the top of the results column and fetch
   // the conversion. One-shot per page; re-fetches on selector change.
   let _currencyAttempted = false;
@@ -1576,6 +1931,31 @@
   const PRIO_LABEL = { block: "Block", lower: "Lower", normal: "Normal", raise: "Raise", pin: "Pin" };
   const PRIO_RANK = { pin: 0, raise: 1, normal: 2, lower: 3, block: 4 };
 
+  // Per-host "typical trackers" count (whotracks.me), fetched once per page by
+  // enhanceTrackerBadges() and used to tint the shield at a glance. Keyed by the
+  // exact host we queried (the server already walked subdomains).
+  const _trkCounts = {};         // host -> integer
+  const TRK_MID = 5, TRK_HI = 10;
+  function trkClass(host) {
+    const n = _trkCounts[host];
+    if (n == null) return "";
+    if (n >= TRK_HI) return " trk-hi";
+    if (n >= TRK_MID) return " trk-mid";
+    return "";
+  }
+
+  // Tracking params the server stripped from this exact result link, carried on
+  // the result element as data-trk* by the tracker_url_remover plugin. Each name
+  // is "Company" or "Company!" (trailing "!" = advertising click id).
+  function trkStripped(result) {
+    const n = parseInt(result.dataset.trk || "0", 10) || 0;
+    const ad = parseInt(result.dataset.trkAd || "0", 10) || 0;
+    const names = (result.dataset.trkNames || "").split(",").filter(Boolean).map((s) => ({
+      name: s.replace(/!$/, ""), ad: /!$/.test(s),
+    }));
+    return { n: n, ad: ad, names: names };
+  }
+
   function loadPrio() {
     try {
       const raw = JSON.parse(localStorage.getItem(PRIO_KEY) || "{}");
@@ -1636,8 +2016,13 @@
     }
     const btn = result.querySelector(":scope .serp-shield-btn");
     if (btn) {
-      btn.className = "serp-shield-btn" + (level !== "normal" ? " lvl-" + level : "");
-      btn.title = level === "normal" ? _("Adjust this site") : (PRIO_LABEL[level] + " · " + host);
+      // A manual priority colour always wins; otherwise tint by tracker density.
+      btn.className = "serp-shield-btn" + (level !== "normal" ? " lvl-" + level : trkClass(host));
+      const trk = _trkCounts[host];
+      const trkNote = (trk != null) ? " · " + trk + " " + (trk === 1 ? _("tracker") : _("trackers")) : "";
+      btn.title = level === "normal"
+        ? _("Adjust this site") + trkNote
+        : PRIO_LABEL[level] + " · " + host + trkNote;
     }
   }
 
@@ -1651,12 +2036,24 @@
       urls.children, (el) => el.classList && el.classList.contains("result"));
     if (!results.length) return;
 
+    // If the Small Web lens is active, make sure its (lazy) host set is loading;
+    // applyPriorities() is re-invoked once it arrives.
+    const lens = activeLens();
+    if (lens && lens.builtin && lens.smallweb) ensureSmallWeb();
+
     results.forEach((r) => {
-      const host = hostnameOf(resultUrl(r));
+      const url = resultUrl(r);
+      const host = hostnameOf(url);
       // Manual per-site rules win; an active "favor" lens fills in for sites the
-      // user hasn't touched, raising them to the top.
+      // user hasn't touched, raising them to the top. Built-in lenses can also
+      // match on the result's title/path (listicles, forum threads), so the
+      // favor check consults title + url, not just the host.
       let level = getLevel(host);
-      if (level === "normal" && lensFavorHost(host)) level = "raise";
+      if (level === "normal") {
+        const a = r.querySelector("h3 a") || r.querySelector("h3");
+        const title = a ? a.textContent.trim() : "";
+        if (lensFavorResult(host, title, url)) level = "raise";
+      }
       styleResult(r, host, level);
     });
 
@@ -1752,10 +2149,13 @@
   // ── The panel ───────────────────────────────────────────────────────────────
 
   let _panelEsc = null;
+  // Optional per-modal teardown (e.g. aborting an in-flight summarize stream).
+  let _panelCleanup = null;
   function closePanel() {
     const back = document.getElementById("serp-modal-backdrop");
     if (back) back.remove();
     if (_panelEsc) { document.removeEventListener("keydown", _panelEsc); _panelEsc = null; }
+    if (_panelCleanup) { try { _panelCleanup(); } catch (_) { /* ignore */ } _panelCleanup = null; }
   }
 
   function infoRow(icon, key, valueHtml, muted) {
@@ -1812,6 +2212,15 @@
             '<button type="button" class="serp-global-btn">' + _("Apply globally") + "</button>" +
             '<div class="serp-global-msg"></div>' +
           "</div>" +
+          '<div class="serp-trk">' +
+            '<div class="serp-trk-head">' +
+              '<span class="serp-trk-ic">' + ICON.shield + "</span>" +
+              '<span class="serp-trk-n">…</span>' +
+              '<span class="serp-trk-lbl"></span>' +
+            "</div>" +
+            '<div class="serp-trk-sub"></div>' +
+            '<div class="serp-trk-names"></div>' +
+          "</div>" +
           '<ul class="serp-info">' +
             infoRow(ICON.lock, _("Connection"), '<span class="serp-info-conn">…</span>', true) +
             infoRow(ICON.starline, _("Popularity"), '<span class="serp-info-pop">…</span>', true) +
@@ -1861,6 +2270,42 @@
     const reg = back.querySelector(".serp-info-reg");
     const own = back.querySelector(".serp-info-own");
 
+    // Tracker breakdown: site-typical count comes from /site_info (filled in
+    // below); the per-link stripped params are already known from the result.
+    const trkNEl = back.querySelector(".serp-trk-n");
+    const trkLblEl = back.querySelector(".serp-trk-lbl");
+    const trkSubEl = back.querySelector(".serp-trk-sub");
+    const trkNamesEl = back.querySelector(".serp-trk-names");
+    const trk = opts.trk || { n: 0, ad: 0, names: [] };
+
+    function paintTrk(siteN, siteCompanies) {
+      if (typeof siteN === "number") {
+        trkNEl.textContent = siteN;
+        trkNEl.className = "serp-trk-n " + (siteN >= TRK_HI ? "hi" : siteN >= TRK_MID ? "mid" : "lo");
+        trkLblEl.textContent = (siteN === 1 ? _("tracker typically loaded") : _("trackers typically loaded"));
+      } else if (siteN === null) {
+        trkNEl.textContent = "—";
+        trkNEl.className = "serp-trk-n";
+        trkLblEl.textContent = _("No tracker data for this site");
+      }  // siteN === undefined → leave the "…" placeholder while loading
+
+      const parts = [];
+      if (typeof siteN === "number" && siteCompanies) {
+        parts.push(_("Across roughly") + " <b>" + siteCompanies + " " +
+          (siteCompanies === 1 ? _("company") : _("companies")) + "</b> " +
+          _("on a typical visit, per whotracks.me."));
+      }
+      if (trk.n > 0) {
+        parts.push(_("We stripped") + " <b>" + trk.n + " " +
+          (trk.n === 1 ? _("tracking parameter") : _("tracking parameters")) + "</b> " +
+          _("from this link") + (trk.ad > 0 ? " (" + trk.ad + " " + _("advertising") + ")" : "") + ".");
+      }
+      trkSubEl.innerHTML = parts.join(" ");
+      trkNamesEl.innerHTML = (trk.names || []).map((c) =>
+        '<span class="serp-trk-chip' + (c.ad ? " ad" : "") + '">' + esc(c.name) + "</span>").join("");
+    }
+    paintTrk(undefined, 0);  // show per-link chips immediately; site count loads
+
     globalBtn.addEventListener("click", () => {
       let token = getAdminToken();
       if (!token) {
@@ -1901,7 +2346,14 @@
     fetch("/site_info?url=" + encodeURIComponent(url), { headers: { Accept: "application/json" } })
       .then((r) => r.json())
       .then((d) => {
-        if (!d || d.type !== "site") { conn.textContent = pop.textContent = reg.textContent = own.textContent = "—"; return; }
+        if (!d || d.type !== "site") {
+          conn.textContent = pop.textContent = reg.textContent = own.textContent = "—";
+          paintTrk(null, 0);
+          return;
+        }
+        paintTrk(typeof d.trackers === "number" ? d.trackers : null, d.tracker_companies || 0);
+        // Keep the at-a-glance shield tint in sync with what the panel shows.
+        if (typeof d.trackers === "number") { _trkCounts[host] = d.trackers; applyPriorities(); }
         conn.parentElement.classList.remove("muted");
         conn.innerHTML = d.secure
           ? _("This site uses") + ' <span class="ok">' + esc(d.scheme) + "</span>"
@@ -1915,7 +2367,10 @@
           globalCur.textContent = d.global_priority || "normal";
         }
       })
-      .catch(() => { conn.textContent = pop.textContent = reg.textContent = own.textContent = "—"; });
+      .catch(() => {
+        conn.textContent = pop.textContent = reg.textContent = own.textContent = "—";
+        paintTrk(null, 0);
+      });
   }
 
   // The "N queries blocked" status opens this: the same modal card as the shield
@@ -1980,6 +2435,31 @@
     document.addEventListener("keydown", _panelEsc);
   }
 
+  // Fetch "typical trackers" counts for every result host in one round-trip and
+  // repaint the shields. Incremental: only asks for hosts not already known, so
+  // infinite-scroll batches are picked up without re-querying earlier ones.
+  const _trkRequested = {};
+  function enhanceTrackerBadges() {
+    const urls = document.getElementById("urls");
+    if (!urls) return;
+    const hosts = [];
+    urls.querySelectorAll(".result").forEach((r) => {
+      const h = hostnameOf(resultUrl(r));
+      if (h && !(h in _trkCounts) && !_trkRequested[h]) { _trkRequested[h] = 1; hosts.push(h); }
+    });
+    if (!hosts.length) return;
+    fetch("/trackers_batch?hosts=" + encodeURIComponent(hosts.slice(0, 100).join(",")),
+          { headers: { Accept: "application/json" } })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d || !d.trackers) return;
+        let any = false;
+        Object.keys(d.trackers).forEach((h) => { _trkCounts[h] = d.trackers[h]; any = true; });
+        if (any) applyPriorities();  // repaint shields with the new tint (no reorder)
+      })
+      .catch(() => { /* badges are best-effort */ });
+  }
+
   function enhanceShields(root) {
     (root || document).querySelectorAll(".result").forEach((result) => {
       if (result.dataset.serpShield) return;
@@ -2003,6 +2483,7 @@
           url: resultUrl(result),
           title: a ? a.textContent.trim() : host,
           favSrc: img ? (img.src || img.getAttribute("src") || "") : "",
+          trk: trkStripped(result),
         });
       });
       // Sit it inline right after the result title. (It can't go in the header
@@ -2065,6 +2546,127 @@
     ],
   };
 
+  // ── Built-in lenses ─────────────────────────────────────────────────────────
+  // Always-present, non-editable "favor" lenses shown above the user's own lenses
+  // in the dropdown. They are NEVER written into usearch.lenses, so they can't be
+  // corrupted or deleted — they live here as a constant and are merged in at
+  // render/lookup time. Unlike user lenses, a built-in can match on more than a
+  // host set: it may also carry a `pathPredicate(url)` and/or a
+  // `titlePredicate(title, url)`. All built-ins are "favor" mode (soft re-rank).
+  //   • "Small Web"   — a large vendored host set (Kagi's smallweb list), lazily
+  //                     fetched once and cached in localStorage.
+  //   • "Forums"      — forum platforms + URL-path heuristics.
+  //   • "Discussions" — discussion aggregators (reddit/HN/SE/lemmy…).
+  //   • "Listicles"   — title/URL heuristics ("10 best…", "Top 5…").
+  const LISTICLE_RE = [
+    /^\s*\d+\s+(best|top|reasons|ways|things|tips|tools|apps|of\b)/i,
+    /\btop\s+\d+\b/i,
+    /\b\d+\s+(best|things|ways|reasons|tips|tools|apps|of\s+the)\b/i,
+    /\blisticle\b/i,
+  ];
+  const FORUM_PATH_RE = /(?:^|\/)(?:forum|forums|viewtopic|threads?|phpbb)(?:\/|\b)|\/t\/\d/i;
+  const BUILTIN_LENSES = [
+    {
+      id: "builtin:smallweb", name: "Small Web", mode: "favor", builtin: true,
+      // hosts loaded lazily from the vendored JSON (see smallWebSet()).
+      smallweb: true,
+    },
+    {
+      id: "builtin:discussions", name: "Discussions", mode: "favor", builtin: true,
+      hosts: ["reddit.com", "news.ycombinator.com", "lobste.rs", "stackexchange.com",
+              "stackoverflow.com", "quora.com", "slashdot.org",
+              "lemmy.world", "lemmy.ml", "beehaw.org", "sh.itjust.works",
+              "discuss.tchncs.de"],
+    },
+    {
+      id: "builtin:forums", name: "Forums", mode: "favor", builtin: true,
+      hosts: ["discourse.org", "phpbb.com", "vbulletin.com", "xenforo.com",
+              "forums.somethingawful.com", "bogleheads.org", "resetera.com",
+              "neogaf.com", "stackexchange.com"],
+      pathPredicate: function (url) {
+        try { return FORUM_PATH_RE.test(new URL(url).pathname); }
+        catch (_) { return false; }
+      },
+    },
+    {
+      id: "builtin:listicles", name: "Listicles", mode: "favor", builtin: true,
+      titlePredicate: function (title) {
+        const t = (title || "").trim();
+        return !!t && LISTICLE_RE.some((re) => re.test(t));
+      },
+    },
+  ];
+  function builtinLens(id) {
+    return BUILTIN_LENSES.find((l) => l.id === id) || null;
+  }
+
+  // ── Small Web host set (lazy, cached) ───────────────────────────────────────
+  // The vendored list is large, so it's fetched ONCE (only while the Small Web
+  // lens is active), cached in localStorage with a version+expiry, parsed into a
+  // Set, and applied via applyPriorities() once ready. All guarded — on any
+  // failure the lens simply does nothing.
+  const SMALLWEB_KEY = "usearch.smallweb";
+  const SMALLWEB_URL = "/static/themes/simple/data/smallweb.json";
+  const SMALLWEB_VER = 1;
+  const SMALLWEB_TTL = 7 * 864e5;  // re-fetch weekly
+  let _smallWebSet = null;         // in-memory Set once parsed
+  let _smallWebLoading = false;
+
+  function smallWebSet() {
+    if (_smallWebSet) return _smallWebSet;
+    // Try the localStorage cache first.
+    try {
+      const raw = JSON.parse(localStorage.getItem(SMALLWEB_KEY) || "null");
+      if (raw && raw.v === SMALLWEB_VER && Array.isArray(raw.d) &&
+          (Date.now() - (raw.t || 0)) < SMALLWEB_TTL) {
+        _smallWebSet = new Set(raw.d);
+        return _smallWebSet;
+      }
+    } catch (_) { /* ignore */ }
+    return null;
+  }
+
+  function ensureSmallWeb() {
+    if (_smallWebSet || smallWebSet() || _smallWebLoading) return;
+    _smallWebLoading = true;
+    fetch(SMALLWEB_URL, { headers: { Accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((arr) => {
+        if (!Array.isArray(arr) || !arr.length) return;
+        _smallWebSet = new Set(arr);
+        try {
+          localStorage.setItem(SMALLWEB_KEY,
+            JSON.stringify({ v: SMALLWEB_VER, t: Date.now(), d: arr }));
+        } catch (_) { /* over-quota: keep the in-memory Set only */ }
+        applyPriorities();  // re-rank now that the list is available
+      })
+      .catch(() => { /* lens just does nothing */ })
+      .finally(() => { _smallWebLoading = false; });
+  }
+
+  // Does a built-in's host set (or vendored Small Web Set) cover this host?
+  function builtinHostMatch(lens, host) {
+    if (!host) return false;
+    let set;
+    if (lens.smallweb) {
+      const sw = smallWebSet();
+      if (!sw) return false;
+      set = sw;  // a Set — .has()
+    } else if (lens.hosts && lens.hosts.length) {
+      set = lens.hosts;  // an array — indexOf via walk below
+    } else {
+      return false;
+    }
+    const has = (set instanceof Set)
+      ? (h) => set.has(h)
+      : (h) => set.indexOf(h) !== -1;
+    const labels = host.split(".");
+    for (let i = 0; i < labels.length - 1; i++) {
+      if (has(labels.slice(i).join("."))) return true;
+    }
+    return false;
+  }
+
   function loadLenses() {
     try {
       const raw = JSON.parse(localStorage.getItem(LENS_KEY) || "null");
@@ -2078,7 +2680,9 @@
   }
   function activeLens() {
     const st = loadLenses();
-    return st.active ? (st.lenses.find((l) => l.id === st.active) || null) : null;
+    if (!st.active) return null;
+    // A built-in id resolves to the constant array; otherwise the user's list.
+    return builtinLens(st.active) || st.lenses.find((l) => l.id === st.active) || null;
   }
   function setActiveLens(id) {
     const st = loadLenses();
@@ -2125,14 +2729,31 @@
   }
 
   // Is this host covered by the active "favor" lens? (subdomain walk, like getLevel)
+  // Built-in lenses match against their own host set / vendored Small Web Set;
+  // user lenses match against their cleaned `sites`. (Host-only check — see
+  // lensFavorResult for the predicate-aware version used during re-rank.)
   function lensFavorHost(host) {
     const lens = activeLens();
     if (!lens || lens.mode !== "favor" || !host) return false;
+    if (lens.builtin) return builtinHostMatch(lens, host);
     const set = (lens.sites || []).map((s) => cleanDomain(s)).filter(Boolean);
     if (!set.length) return false;
     const labels = host.split(".");
     for (let i = 0; i < labels.length - 1; i++) {
       if (set.indexOf(labels.slice(i).join(".")) !== -1) return true;
+    }
+    return false;
+  }
+
+  // Full "is this result favored?" check used by applyPriorities: host match plus
+  // any built-in path/title predicate. title/url come from the result DOM node.
+  function lensFavorResult(host, title, url) {
+    const lens = activeLens();
+    if (!lens || lens.mode !== "favor") return false;
+    if (lensFavorHost(host)) return true;
+    if (lens.builtin) {
+      if (lens.pathPredicate && url && lens.pathPredicate(url)) return true;
+      if (lens.titlePredicate && lens.titlePredicate(title, url)) return true;
     }
     return false;
   }
@@ -2222,16 +2843,23 @@
 
   function openLensMenu(menu, btn) {
     const st = loadLenses();
-    let html =
-      '<button type="button" class="serp-lens-item' + (!st.active ? " active" : "") +
-        '" data-id="">' + _("All") + "</button>";
-    st.lenses.forEach((l) => {
-      html += '<button type="button" class="serp-lens-item' +
+    const itemHtml = (l) =>
+      '<button type="button" class="serp-lens-item' +
         (st.active === l.id ? " active" : "") + '" data-id="' + esc(l.id) + '">' +
         "<span>" + esc(l.name) + "</span>" +
         '<span class="serp-lens-mode">' + (l.mode === "only" ? _("only") : _("favor")) + "</span>" +
       "</button>";
-    });
+    let html =
+      '<button type="button" class="serp-lens-item' + (!st.active ? " active" : "") +
+        '" data-id="">' + _("All") + "</button>";
+    // Built-in lenses first, under a subtle label.
+    html += '<div class="serp-lens-grouplabel">' + _("Built-in") + "</div>";
+    BUILTIN_LENSES.forEach((l) => { html += itemHtml(l); });
+    // The user's own lenses next.
+    if (st.lenses.length) {
+      html += '<div class="serp-lens-grouplabel">' + _("Your lenses") + "</div>";
+      st.lenses.forEach((l) => { html += itemHtml(l); });
+    }
     html += '<div class="serp-lens-divider"></div>' +
       '<button type="button" class="serp-lens-item serp-lens-edit-btn">' + _("Edit…") + "</button>";
     menu.innerHTML = html;
@@ -2271,12 +2899,24 @@
     setActiveLens(id);
     refreshLensBtn();
     const q = lensQ();
+    const lens = activeLens();
     const onResults = !!document.getElementById("results");
-    if (onResults && q && stripLensClause(q.value)) {
+    // "only" lenses must re-query the engines (true scoping). "favor" lenses
+    // (all built-ins included) only re-rank what's already on screen — no reload,
+    // UNLESS the page is currently scoped by a previous "only" lens (its site:
+    // clause is still in the server-rendered query), in which case we must
+    // re-submit to clear the scope and bring back the full result set.
+    let pageScoped = false;
+    try {
+      const urlQ = new URLSearchParams(window.location.search).get("q") || "";
+      pageScoped = LENS_CLAUSE_RE.test(urlQ);
+    } catch (_) { /* ignore */ }
+    const needsResubmit = (lens && lens.mode === "only") || pageScoped;
+    if (needsResubmit && onResults && q && stripLensClause(q.value)) {
       const form = lensForm();
       if (form.requestSubmit) form.requestSubmit(); else form.submit();
     } else {
-      applyPriorities();  // home page / empty query: re-rank anything on screen
+      applyPriorities();  // home page / empty query / favor lens: re-rank in place
     }
   }
 
@@ -2442,6 +3082,27 @@
     wrap.querySelector(".serp-sync-link").addEventListener("click", openSyncModal);
   }
 
+  // Discreet home-page entry points to the standalone AI tools, placed next to
+  // the "sync settings" link. Home page only, idempotent.
+  function buildHomeLinks() {
+    if (!document.querySelector(".index")) return;
+    if (document.getElementById("serp-home-links")) return;
+    const form = document.getElementById("search");
+    if (!form || !form.parentNode) return;
+    const wrap = document.createElement("div");
+    wrap.id = "serp-home-links";
+    wrap.className = "serp-home-links";
+    wrap.innerHTML =
+      '<a class="serp-home-link" href="/assistant">' + ICON.chat +
+        "<span>" + _("Ask the Assistant") + "</span></a>" +
+      '<a class="serp-home-link" href="/summarize">' + ICON.link +
+        "<span>" + _("Summarize a link") + "</span></a>";
+    // Place just below the search form (above the sync link if present).
+    const sync = document.getElementById("serp-sync-home");
+    if (sync) form.parentNode.insertBefore(wrap, sync);
+    else form.parentNode.insertBefore(wrap, form.nextSibling);
+  }
+
   function openSyncModal() {
     closePanel();
     const back = document.createElement("div");
@@ -2586,11 +3247,14 @@
   // ── Orchestration ──────────────────────────────────────────────────────────
 
   function enhanceAll() {
+    ensureDictionaryBox();
     ensureCurrencyBox();
     buildTopSection();
     enhanceCopyLinks(document);
+    enhanceSummaries(document);
     enhanceCards(document);
     enhanceShields(document);
+    enhanceTrackerBadges();
     applyPriorities();
     buildStatusBar();
     enhanceAiSummary();
@@ -2603,6 +3267,8 @@
     buildLensUI();
     // The "sync settings" entry point is home-page only (gated inside).
     buildSyncUI();
+    // Home-page AI tool links (gated inside).
+    buildHomeLinks();
     if (!document.getElementById("results") && !document.querySelector(".result")) return;
     enhanceAll();
 
