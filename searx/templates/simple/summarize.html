@@ -1,0 +1,94 @@
+{% extends "simple/page_with_header.html" %}
+{% block title %}{{ _('Summarize') }} - {% endblock %}
+{% block content %}
+<div class="summarize-page">
+  <style>
+    .summarize-page {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+      box-sizing: border-box;
+    }
+    .summarize-page h1 {
+      font-size: 1.35rem;
+      margin: 0 0 0.35rem;
+    }
+    .summarize-page .sz-sub {
+      color: var(--color-base-font-light, #888);
+      font-size: 0.9rem;
+      margin: 0 0 1.25rem;
+    }
+    .summarize-page .sz-form {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .summarize-page .sz-input {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 0.6rem 0.8rem;
+      font-size: 0.95rem;
+      border-radius: 8px;
+      border: 1px solid var(--color-base-border, rgba(128,128,128,0.35));
+      background: var(--color-base-background, #fff);
+      color: var(--color-base-font, inherit);
+      box-sizing: border-box;
+    }
+    .summarize-page .sz-btn {
+      flex: 0 0 auto;
+      padding: 0.6rem 1.2rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: 8px;
+      border: 1px solid rgba(66,133,244,0.4);
+      background: rgba(66,133,244,0.14);
+      color: var(--color-base-font, inherit);
+      cursor: pointer;
+    }
+    .summarize-page .sz-btn:hover { background: rgba(66,133,244,0.24); }
+    .summarize-page .sz-btn[disabled] { opacity: 0.55; cursor: default; }
+    #sz-result {
+      border: 1px solid var(--color-base-border, rgba(128,128,128,0.25));
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      min-height: 2.5rem;
+      line-height: 1.65;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      display: none;
+    }
+    #sz-result.visible { display: block; }
+    #sz-result .sz-cursor {
+      display: inline-block; width: 2px; height: 1em;
+      background: #4285f4; margin-left: 2px; vertical-align: text-bottom;
+      animation: sz-blink 0.8s step-end infinite;
+    }
+    @keyframes sz-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    #sz-result .sz-error { color: #c0392b; }
+    .summarize-page .sz-loading {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      color: var(--color-base-font-light, #888); font-size: 0.9rem;
+    }
+    .summarize-page .sz-spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(128,128,128,0.25); border-top-color: #4285f4;
+      border-radius: 50%; animation: sz-spin 0.7s linear infinite;
+    }
+    @keyframes sz-spin { to { transform: rotate(360deg); } }
+  </style>
+
+  <h1>{{ _('Summarize') }}</h1>
+  <p class="sz-sub">{{ _('Paste any page or YouTube link to get an AI summary.') }}</p>
+
+  <form class="sz-form" id="sz-form" autocomplete="off">
+    <input type="url" id="sz-url" class="sz-input" name="url"
+           placeholder="https://example.com/article  or  https://youtu.be/…"
+           value="{{ prefill_url or '' }}" />
+    <button type="submit" id="sz-submit" class="sz-btn">{{ _('Summarize') }}</button>
+  </form>
+
+  <div id="sz-result" aria-live="polite"></div>
+</div>
+<script src="/static/themes/simple/js/summarize.js"></script>
+{% endblock %}

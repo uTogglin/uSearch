@@ -295,6 +295,12 @@ plugins:
   searx.plugins.device_sync.SXNGPlugin:
     active: true
 
+  searx.plugins.summarizer.SXNGPlugin:
+    active: true
+
+  searx.plugins.assistant.SXNGPlugin:
+    active: true
+
 
 # Configuration of the "Privacy redirect plugin":
 #
@@ -472,6 +478,67 @@ ai_summary:
   response_cache_enabled: true
   response_cache_ttl: 604800           # 7 days, in seconds
   # response_cache_path: "/var/cache/searxng/ai_summary_cache.db"
+
+
+# Configuration of the "Universal Summarizer" plugin:
+#
+# Summarizes ANY URL or YouTube video on demand (not just SERP results). Adds a
+# "Summarize" action on each result + a paste-a-URL page at /summarize. Shares
+# the OpenRouter + E2E plumbing in searx/ai_common.py. The content is fetched
+# server-side (direct first; on a block it retries ONCE through the configured
+# fallback proxy, keeping a strict size cap to minimise bandwidth) and extracted
+# with lxml; YouTube transcripts are scraped best-effort.
+#   GET  /ai_summarize?url=   -> plaintext SSE stream
+#   POST /eai_summarize       -> E2E-encrypted SSE stream ({"url": "..."})
+#   GET  /summarize[?url=]    -> paste-a-URL page (auto-starts when ?url= given)
+summarizer:
+  base_url: "https://openrouter.ai/api/v1"
+  api_key: ""                          # else OPENROUTER_API_KEY env var (preferred)
+  model: "deepseek/deepseek-v4-flash"  # fast/cheap model — matches ai_summary
+  http_referer: ""
+  x_title: "uSearch Summarizer"
+  max_tokens: 500
+  timeout: 60
+  # Per-IP token-bucket rate limit (strict — this is an LLM-cost endpoint):
+  rate_limit_capacity: 5               # burst size
+  rate_limit_rate: 0.5                 # tokens refilled per second
+  # Persistent (SQLite) cache of completed summaries, keyed by URL:
+  response_cache_enabled: true
+  response_cache_ttl: 604800           # 7 days
+  # response_cache_path: "/var/cache/searxng/summarizer_cache.db"
+  # Outbound page/transcript fetch (bandwidth-minimising):
+  fetch_timeout: 12
+  fetch_max_bytes: 1572864             # 1.5 MB streamed cap per page
+  extract_max_chars: 12000             # text sent to the model, per request
+  proxy_url: ""                        # else falls back to outgoing.fallback_proxies
+
+
+# Configuration of the "Assistant" plugin:
+#
+# Multi-turn AI chat with web access at /assistant — a natural extension of the
+# AI Summary. Each turn runs a SearXNG search on the latest user message and
+# injects the top results as cited context (auto-search injection). Shares the
+# OpenRouter + E2E plumbing in searx/ai_common.py. This is the heaviest LLM-cost
+# endpoint (chat + a live search per turn), so the rate limit is strict.
+#   POST /assistant_chat  -> plaintext SSE   ({"messages": [...], "web": bool})
+#   POST /eassistant      -> E2E-encrypted SSE (same body)
+#   GET  /assistant       -> chat page
+assistant:
+  base_url: "https://openrouter.ai/api/v1"
+  api_key: ""                          # else OPENROUTER_API_KEY env var (preferred)
+  model: "deepseek/deepseek-v4-flash"
+  http_referer: ""
+  x_title: "uSearch Assistant"
+  max_tokens: 800
+  temperature: 0.4
+  timeout: 60
+  web_results: 5                       # results injected as context per turn
+  max_turns: 12                        # conversation history cap
+  max_message_chars: 4000
+  max_total_chars: 24000
+  # Per-IP token-bucket rate limit (strict — chat + a search per turn):
+  rate_limit_capacity: 4               # burst size
+  rate_limit_rate: 0.3                 # tokens refilled per second
 
 
 # Result-quality tuning via the "Hostnames plugin" (active above).
