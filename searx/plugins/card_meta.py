@@ -48,7 +48,7 @@ from urllib.parse import urlsplit
 
 import httpx
 from flask_babel import gettext as _
-from searx import get_setting, popularity, site_priority
+from searx import get_setting, popularity, site_priority, trackers
 from searx.plugins import Plugin, PluginInfo
 
 if t.TYPE_CHECKING:
@@ -254,6 +254,60 @@ def _fetch_reddit(post_id: str, sub: str) -> dict:
     }
 
 
+# ── Dictionary instant-answer ─────────────────────────────────────────────────
+
+# A single word or short hyphenated/spaced phrase — keeps the proxied lookup to
+# real dictionary terms and out of the SSRF / abuse space.
+_DEFINE_RE = re.compile(r"^[A-Za-z][A-Za-z .'-]{0,40}[A-Za-z.]$|^[A-Za-z]$")
+
+
+def _fetch_definition(term: str) -> dict:
+    """Normalise the free dictionaryapi.dev response into a compact card."""
+    url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{term.strip()}"
+    data = _http_json(url, {})
+    if not isinstance(data, list) or not data:
+        return {"type": None, "missing": True}
+    entry = data[0]
+
+    phonetic = (entry.get("phonetic") or "").strip()
+    audio = ""
+    for ph in entry.get("phonetics") or []:
+        if not phonetic and (ph.get("text") or "").strip():
+            phonetic = ph["text"].strip()
+        if not audio and (ph.get("audio") or "").strip():
+            audio = ph["audio"].strip()
+
+    meanings = []
+    for m in (entry.get("meanings") or [])[:3]:
+        defs = []
+        for d in (m.get("definitions") or [])[:3]:
+            text = (d.get("definition") or "").strip()
+            if not text:
+                continue
+            defs.append({
+                "def": text[:300],
+                "example": (d.get("example") or "").strip()[:200],
+            })
+        if not defs:
+            continue
+        meanings.append({
+            "pos": (m.get("partOfSpeech") or "").strip()[:40],
+            "defs": defs,
+            "synonyms": [s for s in (m.get("synonyms") or [])[:6] if s][:6],
+        })
+
+    if not meanings:
+        return {"type": None, "missing": True}
+    return {
+        "type": "define",
+        "word": (entry.get("word") or term).strip()[:60],
+        "phonetic": phonetic[:60],
+        "audio": audio if audio.startswith("https://") else "",
+        "meanings": meanings,
+        "source": (entry.get("sourceUrls") or [""])[0][:200],
+    }
+
+
 # ── Generic site info (for the "shield" panel) ────────────────────────────────
 
 def _panel_host(raw_url: str) -> "tuple[str, str] | None":
@@ -334,12 +388,17 @@ def _fetch_rdap(host: str) -> dict:
 
 
 def _site_info(host: str) -> dict:
-    """RDAP + popularity for a host (cacheable; global level added per request)."""
+    """RDAP + popularity + tracker density for a host (cacheable)."""
     rdap = _fetch_rdap(host)
+    tr = trackers.lookup(host)
     return {
         "registered": rdap.get("registered") or "",
         "owner": rdap.get("owner") or "",
         "popularity_rank": popularity.rank(host),
+        # Typical third-party trackers this domain loads (whotracks.me); None
+        # means "not measured", which the panel shows as "no data" (not "clean").
+        "trackers": tr["trackers"] if tr else None,
+        "tracker_companies": tr["companies"] if tr else None,
     }
 
 
@@ -465,6 +524,61 @@ class SXNGPlugin(Plugin):
                                 mimetype="application/json", status=500)
             return Response(json.dumps({"ok": True, "host": host, "level": level}),
                             mimetype="application/json")
+
+        @app.route("/trackers_batch", methods=["GET"])
+        def trackers_batch():
+            """At-a-glance tracker counts for every host on the page at once.
+
+            The shield colours itself by how many trackers a domain typically
+            loads; fetching that per result would be N round-trips, so the page
+            asks for all visible hosts in one call (mirrors /favicon_batch).
+            Reads the local whotracks.me map only — no outbound request, so no
+            rate-limit needed.
+            """
+            raw = freq.args.get("hosts", "")[:4000]
+            out: dict = {}
+            for host in raw.split(","):
+                host = host.strip().lower().lstrip(".")
+                if not host or not _HOST_ATTR_RE.match(host) or host in out:
+                    continue
+                tr = trackers.lookup(host)
+                if tr:
+                    out[host] = tr["trackers"]
+            return Response(json.dumps({"trackers": out}), mimetype="application/json",
+                            headers={"Cache-Control": "private, max-age=600"})
+
+        @app.route("/define", methods=["GET"])
+        def define():
+            """Dictionary instant-answer: server-proxied so the user's lookup
+            never reaches the dictionary provider directly (mirrors card_meta)."""
+            term = freq.args.get("q", "").strip()[:60]
+            if not term or not _DEFINE_RE.match(term):
+                return Response('{"type":null}', mimetype="application/json", status=400)
+            key = f"def:{term.lower()}"
+
+            cached = _cache_get(key)
+            if cached is not None:
+                return Response(json.dumps(cached), mimetype="application/json",
+                                headers={"X-Cache": "HIT"})
+            if not _check_rate_limit(_client_ip()):
+                return Response('{"type":null,"error":"rate_limited"}',
+                                mimetype="application/json", status=429)
+            try:
+                data = _fetch_definition(term)
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 404:
+                    miss = {"type": None, "missing": True}
+                    _cache_set(key, miss)
+                    return Response(json.dumps(miss), mimetype="application/json")
+                return Response('{"type":null,"error":"upstream"}',
+                                mimetype="application/json", status=502)
+            except Exception as exc:  # noqa: BLE001 — never 500 the SERP
+                logger.warning("define error: %s", exc)
+                return Response('{"type":null,"error":"fetch"}',
+                                mimetype="application/json", status=502)
+            _cache_set(key, data)
+            return Response(json.dumps(data), mimetype="application/json",
+                            headers={"X-Cache": "MISS"})
 
         # ── Script injection ─────────────────────────────────────────────
         @app.after_request
